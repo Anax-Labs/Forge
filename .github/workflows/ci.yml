@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  rust:
+    name: Rust (build, test, clippy)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.89.0"
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Build workspace
+        run: cargo build --workspace
+      - name: Test (golden vectors + LiteSVM program tests)
+        run: cargo test --workspace
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -W clippy::all -W clippy::pedantic
+
+  anchor:
+    name: Anchor (build)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.89.0"
+      - uses: Swatinem/rust-cache@v2
+      - name: Install Solana CLI
+        run: |
+          sh -c "$(curl -sSfL https://release.anza.xyz/stable/install)"
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+      - name: Create local wallet
+        run: solana-keygen new --no-bip39-passphrase --force -o "$HOME/.config/solana/id.json"
+      - name: Install Anchor via AVM
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/otter-sec/anchor/master/avm/install | sh
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+      - name: Select Anchor 1.1.2
+        run: |
+          avm install 1.1.2
+          avm use 1.1.2
+      - name: Anchor build
+        run: anchor build

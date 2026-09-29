@@ -1,0 +1,17 @@
+{
+  "name": "@onchain-forge/sdk",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Forge TypeScript SDK (Codama-generated client + verification helpers)",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "build": "echo \"sdk scaffold (Phase 10)\"",
+    "test": "echo \"no sdk tests yet\"",
+    "lint": "echo \"no sdk lint yet\""
+  },
+  "dependencies": {
+    "@solana/kit": "^8.0.0"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "name": "@onchain-forge/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Forge repository explorer / verification UI (Next.js)",
+  "scripts": {
+    "build": "echo \"web scaffold (Phase 10)\"",
+    "test": "echo \"no web tests yet\"",
+    "lint": "echo \"no web lint yet\""
+  }
+}

@@ -1,0 +1,11 @@
+[package]
+name = "forge-object"
+version = "0.1.0"
+description = "Canonical Git-object, hashing, attestation and history-root engine for Forge"
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+serde = { workspace = true }

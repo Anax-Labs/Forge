@@ -1,0 +1,32 @@
+[workspace]
+members = [
+    "programs/*",
+    "cli",
+    "crates/*",
+]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+rust-version = "1.89.0"
+
+[workspace.dependencies]
+anchor-lang = "1.1.2"
+
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+gix = "0.88"
+reqwest = { version = "0.13", features = ["blocking", "json"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+solana-sdk = "3"
+thiserror = "2"
+
+[profile.release]
+overflow-checks = true
+lto = "fat"
+codegen-units = 1
+[profile.release.build-override]
+opt-level = 3
+incremental = false
+codegen-units = 1

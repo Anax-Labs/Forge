@@ -1,0 +1,21 @@
+[package]
+name = "forge"
+version = "0.1.0"
+description = "Forge CLI — Git-backed onchain version control client"
+edition.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "forge"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = { workspace = true }
+clap = { workspace = true }
+forge-object = { path = "../crates/forge-object" }
+gix = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+solana-sdk = { workspace = true }
+thiserror = { workspace = true }
