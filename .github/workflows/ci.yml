@@ -6,11 +6,15 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  # Prebuilt Anchor/AVM binaries require GLIBC_2.39 (Ubuntu 24.04).
+  # Do not downgrade these jobs to ubuntu-22.04.
+  SOLANA_VERSION: v3.1.10
+  ANCHOR_VERSION: 1.1.2
 
 jobs:
   rust:
     name: Rust (build, test, clippy)
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@master
@@ -19,15 +23,17 @@ jobs:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
       - name: Build workspace
-        run: cargo build --workspace
+        run: cargo build --workspace --locked
       - name: Test (golden vectors + LiteSVM program tests)
-        run: cargo test --workspace
+        run: cargo test --workspace --locked
       - name: Clippy
-        run: cargo clippy --workspace --all-targets -- -W clippy::all -W clippy::pedantic
+        run: cargo clippy --workspace --all-targets --locked -- -W clippy::all -W clippy::pedantic
+      - name: Format check
+        run: cargo fmt --all -- --check
 
   anchor:
     name: Anchor (build)
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@master
@@ -36,17 +42,18 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Install Solana CLI
         run: |
-          sh -c "$(curl -sSfL https://release.anza.xyz/stable/install)"
+          sh -c "$(curl -sSfL https://release.anza.xyz/${SOLANA_VERSION}/install)"
           echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+      - name: Install Anchor CLI
+        run: |
+          curl -sSfL "https://github.com/otter-sec/anchor/releases/download/v${ANCHOR_VERSION}/anchor-${ANCHOR_VERSION}-x86_64-unknown-linux-gnu" -o /tmp/anchor
+          chmod +x /tmp/anchor
+          sudo mv /tmp/anchor /usr/local/bin/anchor
       - name: Create local wallet
         run: solana-keygen new --no-bip39-passphrase --force -o "$HOME/.config/solana/id.json"
-      - name: Install Anchor via AVM
+      - name: Tool versions
         run: |
-          curl -sSfL https://raw.githubusercontent.com/otter-sec/anchor/master/avm/install | sh
-          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
-      - name: Select Anchor 1.1.2
-        run: |
-          avm install 1.1.2
-          avm use 1.1.2
+          solana --version
+          anchor --version
       - name: Anchor build
         run: anchor build
