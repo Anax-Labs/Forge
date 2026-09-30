@@ -9,6 +9,7 @@ use forge_repository::constants::{COMMIT_SEED, REPO_SEED};
 use forge_repository::events::CommitCreated;
 use forge_repository::state::{CommitAccount, RepositoryAccount};
 use litesvm::LiteSVM;
+use solana_account::Account;
 use solana_keypair::Keypair;
 use solana_message::{AccountMeta, Address, Instruction, Message};
 use solana_signer::Signer;
@@ -17,6 +18,7 @@ use solana_transaction::Transaction;
 const SYSTEM_PROGRAM: &str = "11111111111111111111111111111111";
 const ED25519_PROGRAM: &str = "Ed25519SigVerify111111111111111111111111111";
 const INSTRUCTIONS_SYSVAR: &str = "Sysvar1nstructions1111111111111111111111111";
+const NATIVE_LOADER: &str = "NativeLoader1111111111111111111111111111111";
 
 fn program_so() -> std::path::PathBuf {
     std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/deploy/forge_repository.so")
@@ -48,6 +50,20 @@ fn setup() -> Option<(LiteSVM, Address, Keypair)> {
         return None;
     }
     let mut svm = LiteSVM::new();
+    // Ed25519 is a precompile. LiteSVM only installs those accounts when the
+    // optional `precompiles` crate feature is on (pulls OpenSSL). Register the
+    // program account ourselves so `invoke_context.is_precompile` can run it.
+    svm.set_account(
+        ed25519_program(),
+        Account {
+            lamports: 1,
+            data: Vec::new(),
+            owner: NATIVE_LOADER.parse().unwrap(),
+            executable: true,
+            rent_epoch: 0,
+        },
+    )
+    .expect("load ed25519 precompile");
     let pid = program_id();
     svm.add_program_from_file(pid, &so).expect("load program");
     let payer = Keypair::new();
@@ -134,12 +150,12 @@ fn ed25519_verify_instruction(
     let msg_off = (DATA_START + 64 + 32) as u16;
     let msg_len = message.len() as u16;
     data.extend_from_slice(&sig_off.to_le_bytes());
-    data.extend_from_slice(&0u16.to_le_bytes());
+    data.extend_from_slice(&u16::MAX.to_le_bytes());
     data.extend_from_slice(&pk_off.to_le_bytes());
-    data.extend_from_slice(&0u16.to_le_bytes());
+    data.extend_from_slice(&u16::MAX.to_le_bytes());
     data.extend_from_slice(&msg_off.to_le_bytes());
     data.extend_from_slice(&msg_len.to_le_bytes());
-    data.extend_from_slice(&0u16.to_le_bytes());
+    data.extend_from_slice(&u16::MAX.to_le_bytes());
     data.extend_from_slice(signature);
     data.extend_from_slice(pubkey);
     data.extend_from_slice(message);

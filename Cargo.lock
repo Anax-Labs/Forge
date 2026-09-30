@@ -1768,6 +1768,7 @@ dependencies = [
  "anchor-lang",
  "forge-object",
  "litesvm",
+ "solana-account",
  "solana-instructions-sysvar",
  "solana-keypair",
  "solana-message",

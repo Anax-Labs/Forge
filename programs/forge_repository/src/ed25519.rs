@@ -84,13 +84,18 @@ fn parse_ed25519_instruction_data(
     let message_size = usize::from(u16::from_le_bytes([data[12], data[13]]));
     let message_ix_index = u16::from_le_bytes([data[14], data[15]]);
 
-    require_eq!(signature_ix_index, 0, ForgeError::InvalidEd25519Instruction);
-    require_eq!(
-        public_key_ix_index,
-        0,
+    require!(
+        is_current_instruction_index(signature_ix_index),
         ForgeError::InvalidEd25519Instruction
     );
-    require_eq!(message_ix_index, 0, ForgeError::InvalidEd25519Instruction);
+    require!(
+        is_current_instruction_index(public_key_ix_index),
+        ForgeError::InvalidEd25519Instruction
+    );
+    require!(
+        is_current_instruction_index(message_ix_index),
+        ForgeError::InvalidEd25519Instruction
+    );
 
     require!(
         signature_offset >= DATA_START
@@ -133,4 +138,10 @@ fn parse_ed25519_instruction_data(
     require!(signature.iter().any(|b| *b != 0), ForgeError::BadSignature);
 
     Ok(())
+}
+
+/// `0` means instruction 0 of the transaction (valid when Ed25519 is first);
+/// `u16::MAX` is the runtime sentinel for "this instruction" (§9.4).
+const fn is_current_instruction_index(index: u16) -> bool {
+    index == 0 || index == u16::MAX
 }
