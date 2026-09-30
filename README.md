@@ -7,9 +7,13 @@ storage.
 
 Working name: `Forge` (protocol), `forge` (CLI).
 
-> Status: **Phase 1 — foundation/scaffolding.** No protocol behavior is
-> implemented yet. See [`phase_implementation.md`](phase_implementation.md) for
-> the 10-phase roadmap and
+> Status: **Phase 3 — onchain state model, PDAs & repository/branch lifecycle.**
+> The full account state model (§4), PDA derivations, and the
+> `initialize_repository` / `create_branch` instructions are implemented with
+> owner-only authorization and `emit_cpi!` events. Commit creation and later
+> phases are pending. See [`phase_implementation.md`](phase_implementation.md)
+> for the 10-phase roadmap,
+> [`docs/adr/`](docs/adr/) for frozen design decisions, and
 > [`ONCHAIN_VERSION_CONTROL_ARCHITECTURE.md`](ONCHAIN_VERSION_CONTROL_ARCHITECTURE.md)
 > for the full architecture specification.
 
@@ -75,6 +79,8 @@ The devnet program ID is a placeholder until the program is first deployed
   dependency graph, requirement coverage matrix, risks, open questions.
 - [`docs/protocol.md`](docs/protocol.md) — canonical byte formats (frozen in Phase 2).
 - [`docs/threat-model.md`](docs/threat-model.md) — security model checklist.
+- [`docs/adr/`](docs/adr/) — architecture decision records (events, names/seeds,
+  state layout & authorization).
 
 ## MVP scope (spec §19.1)
 

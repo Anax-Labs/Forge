@@ -20,7 +20,10 @@ custom-heap = []
 custom-panic = []
 
 [dependencies]
-anchor-lang = { workspace = true }
+anchor-lang = { workspace = true, features = ["event-cpi"] }
+# Canonical object/hashing/history engine. The program imports the genesis
+# history-root function rather than re-implementing it (§5, §5.6).
+forge-object = { path = "../../crates/forge-object" }
 
 [dev-dependencies]
 litesvm = "0.10.0"

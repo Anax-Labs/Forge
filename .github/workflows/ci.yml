@@ -25,6 +25,9 @@ jobs:
       - name: Build workspace
         run: cargo build --workspace --locked
       - name: Test (golden vectors + LiteSVM program tests)
+        # The LiteSVM program tests skip here because no SBF artifact exists
+        # until `anchor build`; the `anchor` job runs them against the built
+        # program below.
         run: cargo test --workspace --locked
       - name: Clippy
         run: cargo clippy --workspace --all-targets --locked -- -W clippy::all -W clippy::pedantic
@@ -57,3 +60,7 @@ jobs:
           anchor --version
       - name: Anchor build
         run: anchor build
+      - name: Test (LiteSVM program tests against built artifact)
+        # `anchor build` produced target/deploy/forge_repository.so, so the
+        # Phase 3 LiteSVM tests execute here rather than skipping.
+        run: cargo test --workspace --locked

@@ -23,3 +23,21 @@ custom merge engine, general rule VM, onchain file storage.
 - Storage disappearance → multi-pin + Arweave + `gc --verify-availability` (Phase 6).
 - Path traversal / symlink payloads → safe tree construction (Phase 2).
 - Malicious metadata → length/charset limits, no log parsing (Phases 3, 9).
+
+## Phase 3 status (implemented)
+
+- **Malicious metadata:** repository/branch names are validated as non-empty
+  printable ASCII with NUL-only padding (`src/name.rs`, ADR 0002); bounded
+  32-byte buffers are stored onchain.
+- **Unauthorized writes:** `initialize_repository` and `create_branch` enforce
+  owner-only authorization (`src/auth.rs`, §16.4).
+- **PDA confusion / squatting:** every `init` account uses explicit seeds with
+  the canonical bump, and the canonical bump is stored in account data
+  (`src/pda.rs`, §11). `create_branch` validates any `from_commit` account's
+  program owner, discriminator, PDA, repository binding, and oid.
+- **Log injection:** events are emitted via `emit_cpi!` call data, never parsed
+  from string logs (ADR 0001, §11 #12).
+- **Reinitialization / revival:** `init` only; `init_if_needed` is forbidden.
+  Duplicate repository/branch creation fails at account init.
+- **Overflow:** any future arithmetic will use checked math; no unbounded
+  arithmetic exists yet.
