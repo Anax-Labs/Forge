@@ -3,13 +3,12 @@
 //! Onchain anchor for Git-like repository history, branch refs, authorship
 //! attestations, and deployed-program source provenance.
 //!
-//! # Phase 3 status
+//! # Phase 3–4 status
 //!
-//! Implemented: the full account state model (§4), PDA derivations (§4), and
-//! the `initialize_repository` / `create_branch` lifecycle instructions
-//! (§9.2), with owner-only authorization (§16.4) and `emit_cpi!` events
-//! (§9.1). Commit creation, branch advancement/merge, storage, provenance and
-//! permissions land in Phases 4–9 (see `phase_implementation.md`).
+//! Implemented: account state model (§4), PDAs, `initialize_repository`,
+//! `create_branch`, and `create_commit` with Ed25519 attestation verification
+//! (§9.2, §9.4). Branch advancement, storage, provenance and permissions land in
+//! Phases 5–9 (see `phase_implementation.md`).
 //!
 //! # One source of truth
 //!
@@ -31,6 +30,7 @@
 
 pub mod auth;
 pub mod constants;
+pub mod ed25519;
 pub mod errors;
 pub mod events;
 pub mod instructions;
@@ -46,10 +46,11 @@ use anchor_lang::prelude::*;
 // crate-visible; re-export them at the root as well so the macro can find
 // them.
 pub(crate) use instructions::create_branch::__client_accounts_create_branch;
+pub(crate) use instructions::create_commit::__client_accounts_create_commit;
 pub(crate) use instructions::initialize_repository::__client_accounts_initialize_repository;
-pub use instructions::{CreateBranch, InitializeRepository};
+pub use instructions::{CreateBranch, CreateCommit, InitializeRepository};
 
-declare_id!("4smCAEoycSXSvVsyic8ircQmHmENPCHn17Fma83SYVbf");
+declare_id!("GDvJ2gS2epXZdCfv2PB13ogJAHoJsNMm2ogLk9664Pje");
 
 #[program]
 pub mod forge_repository {
@@ -92,5 +93,36 @@ pub mod forge_repository {
         authority: Pubkey,
     ) -> Result<()> {
         instructions::create_branch::handler(ctx, name, from_commit, authority)
+    }
+
+    /// Anchors a wallet-signed commit and advances the repository history root (§9.2).
+    ///
+    /// The transaction must prepend an Ed25519 native verify instruction whose
+    /// message is the 32-byte `attestation_hash` (§9.4).
+    ///
+    /// # Errors
+    /// See [`instructions::create_commit::handler`] for validation failures.
+    pub fn create_commit(
+        ctx: Context<CreateCommit>,
+        commit_oid: [u8; 32],
+        parent_count: u8,
+        parent_a: [u8; 32],
+        parent_b: [u8; 32],
+        tree_oid: [u8; 32],
+        authored_at: i64,
+        message_hash: [u8; 32],
+        attestation_hash: [u8; 32],
+    ) -> Result<()> {
+        instructions::create_commit::handler(
+            ctx,
+            commit_oid,
+            parent_count,
+            parent_a,
+            parent_b,
+            tree_oid,
+            authored_at,
+            message_hash,
+            attestation_hash,
+        )
     }
 }

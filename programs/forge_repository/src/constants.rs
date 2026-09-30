@@ -7,6 +7,8 @@
 //! Spec traceability: §4 (PDA seeds), §5.6 (history domain prefixes live in
 //! `forge-object`), §7.5 (permission modes), §8 (storage backends).
 
+use anchor_lang::prelude::*;
+
 /// Repository PDA seed prefix: `["repo", owner, name]`.
 pub const REPO_SEED: &[u8] = b"repo";
 /// Branch PDA seed prefix: `["branch", repository, name]`.
@@ -19,6 +21,14 @@ pub const TAG_SEED: &[u8] = b"tag";
 pub const PERM_SEED: &[u8] = b"perm";
 /// Program-source attestation PDA seed prefix: `["prog", program_id]`.
 pub const PROG_SEED: &[u8] = b"prog";
+
+/// Native Ed25519 signature verification program (§9.4).
+pub const ED25519_PROGRAM_ID: Pubkey =
+    pubkey!("Ed25519SigVerify111111111111111111111111111");
+
+/// Instructions sysvar (transaction introspection, §9.4).
+pub const INSTRUCTIONS_SYSVAR_ID: Pubkey =
+    pubkey!("Sysvar1nstructions1111111111111111111111111");
 
 /// Repository / branch / tag name buffer length.
 ///

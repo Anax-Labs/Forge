@@ -14,4 +14,5 @@ pub mod update_branch;
 pub mod update_permissions;
 
 pub use create_branch::CreateBranch;
+pub use create_commit::CreateCommit;
 pub use initialize_repository::InitializeRepository;

@@ -42,4 +42,32 @@ pub enum ForgeError {
     /// An arithmetic operation overflowed (checked math, §11).
     #[msg("arithmetic overflow")]
     MathOverflow,
+
+    /// `parent_count` must be 0, 1, or 2 (§6.4).
+    #[msg("parent_count must be 0, 1, or 2")]
+    InvalidParentCount,
+
+    /// Commit or tree oid, or attestation hash, was all-zero or malformed.
+    #[msg("commit oid, tree oid, or attestation hash is invalid")]
+    InvalidCommitOid,
+
+    /// A parent oid equals the new commit oid (§6.4).
+    #[msg("commit cannot be its own parent")]
+    SelfParent,
+
+    /// Root commit (`parent_count == 0`) on a repository that already has commits.
+    #[msg("only the first commit may have no parent")]
+    RootOnNonemptyRepo,
+
+    /// Ed25519 pubkey or message did not match the expected attestation (§9.4).
+    #[msg("Ed25519 signature verification failed")]
+    BadSignature,
+
+    /// Preceding instruction was not a valid Ed25519 verify ix (§9.4).
+    #[msg("invalid or missing Ed25519 program instruction")]
+    InvalidEd25519Instruction,
+
+    /// Parent oid arguments or accounts are inconsistent (§6.4).
+    #[msg("invalid parent commit reference")]
+    InvalidParent,
 }

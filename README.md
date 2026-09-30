@@ -7,11 +7,9 @@ storage.
 
 Working name: `Forge` (protocol), `forge` (CLI).
 
-> Status: **Phase 3 — onchain state model, PDAs & repository/branch lifecycle.**
-> The full account state model (§4), PDA derivations, and the
-> `initialize_repository` / `create_branch` instructions are implemented with
-> owner-only authorization and `emit_cpi!` events. Commit creation and later
-> phases are pending. See [`phase_implementation.md`](phase_implementation.md)
+> Status: **Phase 4 — onchain commit creation & Ed25519 verification.**
+> Repository/branch lifecycle (Phase 3) plus `create_commit` with wallet
+> attestation verification. Branch updates and later phases are pending. See [`phase_implementation.md`](phase_implementation.md)
 > for the 10-phase roadmap,
 > [`docs/adr/`](docs/adr/) for frozen design decisions, and
 > [`ONCHAIN_VERSION_CONTROL_ARCHITECTURE.md`](ONCHAIN_VERSION_CONTROL_ARCHITECTURE.md)

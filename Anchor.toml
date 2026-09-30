@@ -1,16 +1,14 @@
-skip_local_validator = true
-
 [toolchain]
 
 [features]
 resolution = true
 skip-lint = false
 
-[programs.localnet]
-forge_repository = "4smCAEoycSXSvVsyic8ircQmHmENPCHn17Fma83SYVbf"
-
 [programs.devnet]
 forge_repository = "4smCAEoycSXSvVsyic8ircQmHmENPCHn17Fma83SYVbf"
+
+[programs.localnet]
+forge_repository = "GDvJ2gS2epXZdCfv2PB13ogJAHoJsNMm2ogLk9664Pje"
 
 [provider]
 cluster = "localnet"

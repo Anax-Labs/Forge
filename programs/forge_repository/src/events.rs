@@ -44,3 +44,20 @@ pub struct BranchCreated {
     /// Slot the branch was created in.
     pub slot: u64,
 }
+
+/// Emitted when a commit is anchored and the history root advances (§9.1).
+#[event]
+pub struct CommitCreated {
+    /// Repository PDA.
+    pub repository: Pubkey,
+    /// Git commit object id (canonical 32-byte form).
+    pub commit_oid: [u8; 32],
+    /// Wallet that signed the attestation.
+    pub author: Pubkey,
+    /// Monotonic sequence assigned at creation (`repo.commit_count` before increment).
+    pub seq: u64,
+    /// Updated append-only history root (§5.6).
+    pub history_root: [u8; 32],
+    /// Slot the commit was anchored in.
+    pub slot: u64,
+}

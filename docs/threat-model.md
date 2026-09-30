@@ -17,7 +17,7 @@ custom merge engine, general rule VM, onchain file storage.
 
 ## Open threats tracked for implementation
 
-- Forged commits → onchain Ed25519 verification (Phase 4).
+- Forged commits → onchain Ed25519 verification in `create_commit` (Phase 4, `programs/forge_repository/src/ed25519.rs`).
 - Unauthorized branch update / replay → authority + `head_seq` CAS (Phases 4–5).
 - History rewrite → append-only `history_root` + logged reset (Phases 4–5).
 - Storage disappearance → multi-pin + Arweave + `gc --verify-availability` (Phase 6).
