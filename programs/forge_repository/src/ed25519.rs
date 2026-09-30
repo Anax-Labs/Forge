@@ -7,9 +7,7 @@
 use crate::constants::ED25519_PROGRAM_ID;
 use crate::errors::ForgeError;
 use anchor_lang::prelude::*;
-use solana_instructions_sysvar::{
-    load_current_index_checked, load_instruction_at_checked,
-};
+use solana_instructions_sysvar::{load_current_index_checked, load_instruction_at_checked};
 
 /// Serialized size of one `Ed25519SignatureOffsets` struct in the instruction data.
 const SIGNATURE_OFFSETS_SERIALIZED_SIZE: usize = 14;
@@ -63,11 +61,7 @@ pub fn verify_ed25519_instruction_preceding(
         ForgeError::InvalidEd25519Instruction
     );
 
-    parse_ed25519_instruction_data(
-        &ed25519_ix.data,
-        expected_author,
-        expected_message,
-    )
+    parse_ed25519_instruction_data(&ed25519_ix.data, expected_author, expected_message)
 }
 
 fn parse_ed25519_instruction_data(
@@ -75,7 +69,10 @@ fn parse_ed25519_instruction_data(
     expected_author: &Pubkey,
     expected_message: &[u8],
 ) -> Result<()> {
-    require!(data.len() >= DATA_START, ForgeError::InvalidEd25519Instruction);
+    require!(
+        data.len() >= DATA_START,
+        ForgeError::InvalidEd25519Instruction
+    );
     require_eq!(data[0], 1, ForgeError::InvalidEd25519Instruction);
     require_eq!(data[1], 0, ForgeError::InvalidEd25519Instruction);
 
@@ -88,7 +85,11 @@ fn parse_ed25519_instruction_data(
     let message_ix_index = u16::from_le_bytes([data[14], data[15]]);
 
     require_eq!(signature_ix_index, 0, ForgeError::InvalidEd25519Instruction);
-    require_eq!(public_key_ix_index, 0, ForgeError::InvalidEd25519Instruction);
+    require_eq!(
+        public_key_ix_index,
+        0,
+        ForgeError::InvalidEd25519Instruction
+    );
     require_eq!(message_ix_index, 0, ForgeError::InvalidEd25519Instruction);
 
     require!(
@@ -129,10 +130,7 @@ fn parse_ed25519_instruction_data(
     );
     require!(message == expected_message, ForgeError::BadSignature);
 
-    require!(
-        signature.iter().any(|b| *b != 0),
-        ForgeError::BadSignature
-    );
+    require!(signature.iter().any(|b| *b != 0), ForgeError::BadSignature);
 
     Ok(())
 }

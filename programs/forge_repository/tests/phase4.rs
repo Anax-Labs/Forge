@@ -79,11 +79,7 @@ fn repo_address(pid: &Address, owner: &Address, repo_name: &[u8; 32]) -> Address
 }
 
 fn commit_address(pid: &Address, repo: &Address, commit_oid: &[u8; 32]) -> Address {
-    Address::find_program_address(
-        &[COMMIT_SEED, repo.as_ref(), commit_oid.as_ref()],
-        pid,
-    )
-    .0
+    Address::find_program_address(&[COMMIT_SEED, repo.as_ref(), commit_oid.as_ref()], pid).0
 }
 
 fn initialize_instruction(
@@ -96,7 +92,11 @@ fn initialize_instruction(
         Address::find_program_address(&[REPO_SEED, owner.as_ref(), repo_name.as_ref()], pid);
     let default_branch_name = default_branch;
     let (branch, _) = Address::find_program_address(
-        &[forge_repository::constants::BRANCH_SEED, repo.as_ref(), default_branch_name.as_ref()],
+        &[
+            forge_repository::constants::BRANCH_SEED,
+            repo.as_ref(),
+            default_branch_name.as_ref(),
+        ],
         pid,
     );
     let mut data = Vec::new();
@@ -120,7 +120,11 @@ fn initialize_instruction(
     }
 }
 
-fn ed25519_verify_instruction(message: &[u8], signature: &[u8; 64], pubkey: &[u8; 32]) -> Instruction {
+fn ed25519_verify_instruction(
+    message: &[u8],
+    signature: &[u8; 64],
+    pubkey: &[u8; 32],
+) -> Instruction {
     const DATA_START: usize = 16;
     let mut data = Vec::new();
     data.push(1);
@@ -289,13 +293,8 @@ fn create_commit_root_advances_history_root() {
     let commit_oid = [3u8; 32];
     let tree_oid = [4u8; 32];
     let message_hash = [5u8; 32];
-    let (attestation_hash, _att) = sample_attestation(
-        &repo,
-        &owner.pubkey(),
-        commit_oid,
-        tree_oid,
-        message_hash,
-    );
+    let (attestation_hash, _att) =
+        sample_attestation(&repo, &owner.pubkey(), commit_oid, tree_oid, message_hash);
     let sig = owner
         .sign_message(&attestation_hash)
         .as_ref()
@@ -423,13 +422,8 @@ fn create_commit_rejects_root_on_nonempty_repo() {
     send(&mut svm, &owner, &[ed_ix.clone(), forge_ix.clone()]).expect("first commit");
 
     let commit_oid2 = [6u8; 32];
-    let (attestation_hash2, _) = sample_attestation(
-        &repo,
-        &owner.pubkey(),
-        commit_oid2,
-        tree_oid,
-        message_hash,
-    );
+    let (attestation_hash2, _) =
+        sample_attestation(&repo, &owner.pubkey(), commit_oid2, tree_oid, message_hash);
     let sig2 = owner
         .sign_message(&attestation_hash2)
         .as_ref()

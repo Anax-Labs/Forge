@@ -4,7 +4,7 @@
 //! instruction (§9.4). The signed message is the 32-byte `attestation_hash`;
 //! the full attestation CBOR stays offchain (§5.5).
 
-use crate::constants::{COMMIT_SEED, INSTRUCTIONS_SYSVAR_ID, ED25519_PROGRAM_ID};
+use crate::constants::{COMMIT_SEED, ED25519_PROGRAM_ID, INSTRUCTIONS_SYSVAR_ID};
 use crate::ed25519::verify_ed25519_instruction_preceding;
 use crate::errors::ForgeError;
 use crate::events::CommitCreated;
@@ -78,28 +78,16 @@ pub fn handler(
     message_hash: [u8; 32],
     attestation_hash: [u8; 32],
 ) -> Result<()> {
-    require!(
-        parent_count <= 2,
-        ForgeError::InvalidParentCount
-    );
+    require!(parent_count <= 2, ForgeError::InvalidParentCount);
 
     let author_key = ctx.accounts.author.key();
     let repo_key = ctx.accounts.repository.key();
 
     crate::auth::require_repo_owner(&ctx.accounts.repository, &author_key)?;
 
-    require!(
-        commit_oid != [0u8; 32],
-        ForgeError::InvalidCommitOid
-    );
-    require!(
-        tree_oid != [0u8; 32],
-        ForgeError::InvalidCommitOid
-    );
-    require!(
-        attestation_hash != [0u8; 32],
-        ForgeError::InvalidCommitOid
-    );
+    require!(commit_oid != [0u8; 32], ForgeError::InvalidCommitOid);
+    require!(tree_oid != [0u8; 32], ForgeError::InvalidCommitOid);
+    require!(attestation_hash != [0u8; 32], ForgeError::InvalidCommitOid);
 
     validate_parent_args(
         parent_count,
@@ -192,23 +180,14 @@ fn validate_parent_args(
         1 => {
             require!(*parent_a != [0u8; 32], ForgeError::InvalidParent);
             require!(*parent_b == [0u8; 32], ForgeError::InvalidParent);
-            require!(
-                *commit_oid != *parent_a,
-                ForgeError::SelfParent
-            );
+            require!(*commit_oid != *parent_a, ForgeError::SelfParent);
         }
         2 => {
             require!(*parent_a != [0u8; 32], ForgeError::InvalidParent);
             require!(*parent_b != [0u8; 32], ForgeError::InvalidParent);
             require!(*parent_a != *parent_b, ForgeError::InvalidParent);
-            require!(
-                *commit_oid != *parent_a,
-                ForgeError::SelfParent
-            );
-            require!(
-                *commit_oid != *parent_b,
-                ForgeError::SelfParent
-            );
+            require!(*commit_oid != *parent_a, ForgeError::SelfParent);
+            require!(*commit_oid != *parent_b, ForgeError::SelfParent);
         }
         _ => return err!(ForgeError::InvalidParentCount),
     }
