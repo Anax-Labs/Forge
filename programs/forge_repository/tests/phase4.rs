@@ -136,6 +136,7 @@ fn initialize_instruction(
     }
 }
 
+#[allow(clippy::cast_possible_truncation)] // Ed25519 instruction offsets are tiny
 fn ed25519_verify_instruction(
     message: &[u8],
     signature: &[u8; 64],
@@ -167,7 +168,7 @@ fn ed25519_verify_instruction(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, clippy::similar_names)]
 fn create_commit_instruction(
     pid: &Address,
     author: &Address,
@@ -397,8 +398,8 @@ fn create_commit_rejects_bad_signature() {
     let err = send(&mut svm, &owner, &[ed_ix, forge_ix]).expect_err("bad sig");
     assert_eq!(
         custom_error_code(&err.err),
-        Some(6011),
-        "expected BadSignature (6011), got {:?}",
+        Some(6012),
+        "expected BadSignature (6012), got {:?}",
         err.err
     );
 }
@@ -464,8 +465,8 @@ fn create_commit_rejects_root_on_nonempty_repo() {
     let err = send(&mut svm, &owner, &[ed_ix2, forge_ix2]).expect_err("second root");
     assert_eq!(
         custom_error_code(&err.err),
-        Some(6010),
-        "expected RootOnNonemptyRepo (6010), got {:?}",
+        Some(6011),
+        "expected RootOnNonemptyRepo (6011), got {:?}",
         err.err
     );
 }

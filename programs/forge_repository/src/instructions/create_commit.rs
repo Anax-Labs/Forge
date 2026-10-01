@@ -66,6 +66,19 @@ pub struct CreateCommit<'info> {
 }
 
 /// Handler for `create_commit`.
+///
+/// # Errors
+/// - [`ForgeError::InvalidParentCount`] if `parent_count > 2`.
+/// - [`ForgeError::Unauthorized`] if the author is not the repository owner.
+/// - [`ForgeError::InvalidCommitOid`] if the commit/tree oid or attestation
+///   hash is zero or not 32 bytes.
+/// - [`ForgeError::InvalidParent`] / [`ForgeError::SelfParent`] /
+///   [`ForgeError::RootOnNonemptyRepo`] for invalid parent linkage.
+/// - [`ForgeError::UnknownCommit`] / [`ForgeError::InvalidPda`] if a parent
+///   account is missing or not the expected commit PDA.
+/// - [`ForgeError::BadSignature`] / [`ForgeError::InvalidEd25519Instruction`] if
+///   the preceding Ed25519 instruction does not authorize `attestation_hash`.
+/// - [`ForgeError::MathOverflow`] on commit-count overflow.
 #[allow(clippy::too_many_arguments)]
 pub fn handler(
     ctx: Context<CreateCommit>,

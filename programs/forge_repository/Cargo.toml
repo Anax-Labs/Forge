@@ -27,7 +27,10 @@ forge-object = { path = "../../crates/forge-object" }
 solana-instructions-sysvar = "3.0.1"
 
 [dev-dependencies]
-litesvm = "0.10.0"
+# `precompiles` makes LiteSVM run the native Ed25519 verifier used by
+# `create_commit` introspection tests (§9.4). Without it, an Ed25519 instruction
+# is treated as an unknown program and fails with `UnsupportedProgramId`.
+litesvm = { version = "0.10.0", features = ["precompiles"] }
 solana-message = "3.0.1"
 solana-transaction = "3.0.2"
 solana-signer = "3.0.0"

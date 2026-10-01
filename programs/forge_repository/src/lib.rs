@@ -107,6 +107,7 @@ pub mod forge_repository {
     ///
     /// # Errors
     /// See [`instructions::create_commit::handler`] for validation failures.
+    #[allow(clippy::too_many_arguments)]
     pub fn create_commit(
         ctx: Context<CreateCommit>,
         commit_oid: [u8; 32],
