@@ -42,5 +42,27 @@ custom merge engine, general rule VM, onchain file storage.
   addresses are pinned by `seeds` + `bump`. `init_if_needed` is forbidden.
   Duplicate repository/branch creation returns `RepositoryAlreadyExists` /
   `BranchAlreadyExists`.
-- **Overflow:** no arithmetic exists yet; checked math is introduced with the
-  first arithmetic in Phase 4.
+- **Overflow:** no arithmetic existed in Phase 3; Phase 4 uses `checked_add`
+  (`commit_count + 1`, Ed25519 offset arithmetic) returning `MathOverflow`.
+
+## Phase 4 status (implemented)
+
+- **Forged commits:** `create_commit` verifies the author's Ed25519 signature over
+  `attestation_hash` via Instructions-sysvar introspection (`src/ed25519.rs`,
+  ADR 0004). Wrong pubkey/message → `BadSignature`; a valid signature over the
+  wrong message, a forged-author signature, and a non-owner author are all
+  rejected (tests: `create_commit_rejects_forged_author_signature`,
+  `create_commit_rejects_unauthorized_author`).
+- **Multiple / malformed Ed25519 instructions:** exactly one Ed25519 instruction
+  is required in the transaction; header, indices, offsets, and non-empty message
+  are validated. Parser edge cases are covered by unit tests (the native program
+  rejects malformed instructions before they reach the program).
+- **Replay / duplicates:** a second `create_commit` for the same
+  `(repo, commit_oid)` fails at Anchor `init` (idempotent by construction, §6.7);
+  `attestation_hash` binds `repo` and `commit`, preventing cross-repo replay.
+- **Invalid parents:** `parent_count ∈ {0,1,2}`, zero-oid rejection, self-parent,
+  missing/unknown parent account, and root-on-nonempty are rejected with distinct
+  codes (`InvalidParentCount`, `InvalidCommitOid`, `SelfParent`, `InvalidParent`,
+  `UnknownCommit`, `InvalidPda`, `RootOnNonemptyRepo`).
+- **Compute budget:** `create_commit` ≈ 32.7k CU including the precompile,
+  asserted `< 200_000` in `create_commit_compute_units_within_default_limit`.

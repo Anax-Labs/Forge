@@ -52,7 +52,7 @@ pub(crate) use instructions::create_commit::__client_accounts_create_commit;
 pub(crate) use instructions::initialize_repository::__client_accounts_initialize_repository;
 pub use instructions::{CreateBranch, CreateCommit, InitializeRepository};
 
-declare_id!("GDvJ2gS2epXZdCfv2PB13ogJAHoJsNMm2ogLk9664Pje");
+declare_id!("4smCAEoycSXSvVsyic8ircQmHmENPCHn17Fma83SYVbf");
 
 #[program]
 pub mod forge_repository {

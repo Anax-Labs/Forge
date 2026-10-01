@@ -266,6 +266,28 @@ A signed commit can be anchored and re-derived; every §6.9 malicious-commit cas
 - The client must prepend the Ed25519 instruction; the program cannot produce it — integration detail to document for Phase 8.
 - `emit_cpi!` requires the event-authority CPI mechanism; confirm Anchor 1.1.x support vs. noop-CPI.
 
+### Status (implemented + hardened)
+
+Core implemented in Tushar's `create_commit` commits; hardened to the phase
+Definition of Done.
+
+- **Instructions/verification:** `create_commit`, `src/ed25519.rs`
+  (exactly-one-Ed25519-instruction introspection, offsets/indices/non-empty
+  checks, pubkey/message match), parent rules, `history_root` append via
+  `forge-object`, `CommitCreated` event. See ADR 0004.
+- **Duplicate commits** use Anchor `init` (idempotent by construction, §6.7);
+  unlike repos/branches (ADR 0003) this deliberately has no custom duplicate
+  error.
+- **Tests added:** duplicate commit, invalid `parent_count`, non-root without
+  parent, self-parent, unknown parent account, zero commit oid, unauthorized
+  author, forged-author signature, multiple Ed25519 instructions, plus 10
+  Ed25519 parser unit tests.
+- **Compute budget:** measured ≈ 32.7k CU (incl. precompile), asserted
+  `< 200_000` (§9.5).
+- **Test infra:** LiteSVM `precompiles` feature enabled in dev-dependencies so
+  the native Ed25519 verifier runs; the harness registers the precompile account
+  and advances the blockhash per send.
+
 ---
 
 ## Phase 5 — Branch Advancement, Merge & History-Safe Rewrites

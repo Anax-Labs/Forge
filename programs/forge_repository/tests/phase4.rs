@@ -252,6 +252,9 @@ fn send(
     litesvm::types::TransactionMetadata,
     litesvm::types::FailedTransactionMetadata,
 > {
+    // Fresh blockhash per send so repeated/identical instructions are not
+    // rejected as AlreadyProcessed (e.g. the duplicate-commit test).
+    svm.expire_blockhash();
     let blockhash = svm.latest_blockhash();
     let tx = Transaction::new_signed_with_payer(
         instructions,
@@ -468,6 +471,324 @@ fn create_commit_rejects_root_on_nonempty_repo() {
         Some(6011),
         "expected RootOnNonemptyRepo (6011), got {:?}",
         err.err
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Additional negative paths (§6.9, §11) and compute-budget check (§9.5)
+// ---------------------------------------------------------------------------
+
+/// Builds a valid `[ed25519_verify, create_commit]` pair signed by `author`.
+/// `tree_oid`/`message_hash` are fixed to keep the tests terse.
+#[allow(clippy::too_many_arguments, clippy::similar_names)]
+fn signed_commit(
+    pid: &Address,
+    repo: Address,
+    author: &Keypair,
+    commit_oid: [u8; 32],
+    parent_count: u8,
+    parent_a: [u8; 32],
+    parent_b: [u8; 32],
+    parent_a_account: Address,
+    parent_b_account: Address,
+) -> [Instruction; 2] {
+    let tree_oid = [4u8; 32];
+    let message_hash = [5u8; 32];
+    let (attestation_hash, _) =
+        sample_attestation(&repo, &author.pubkey(), commit_oid, tree_oid, message_hash);
+    let sig = author
+        .sign_message(&attestation_hash)
+        .as_ref()
+        .try_into()
+        .expect("signature length");
+    let ed_ix = ed25519_verify_instruction(&attestation_hash, &sig, &author.pubkey().to_bytes());
+    let forge_ix = create_commit_instruction(
+        pid,
+        &author.pubkey(),
+        repo,
+        commit_oid,
+        parent_count,
+        parent_a,
+        parent_b,
+        tree_oid,
+        1_700_000_000,
+        message_hash,
+        attestation_hash,
+        parent_a_account,
+        parent_b_account,
+    );
+    [ed_ix, forge_ix]
+}
+
+fn assert_custom(code: u32, err: &solana_transaction::TransactionError) {
+    assert_eq!(
+        custom_error_code(err),
+        Some(code),
+        "expected error {code}, got {err:?}"
+    );
+}
+
+#[test]
+fn create_commit_rejects_duplicate_commit() {
+    let Some((mut svm, pid, owner)) = setup() else {
+        return;
+    };
+    let repo = init_repo(&mut svm, &pid, &owner);
+    let pair = signed_commit(
+        &pid,
+        repo,
+        &owner,
+        [3u8; 32],
+        0,
+        [0u8; 32],
+        [0u8; 32],
+        system_program(),
+        system_program(),
+    );
+    send(&mut svm, &owner, &pair).expect("first commit");
+    // Second create_commit for the same commit oid must fail at `init`.
+    assert!(
+        send(&mut svm, &owner, &pair).is_err(),
+        "duplicate commit must be rejected"
+    );
+}
+
+#[test]
+fn create_commit_rejects_invalid_parent_count() {
+    let Some((mut svm, pid, owner)) = setup() else {
+        return;
+    };
+    let repo = init_repo(&mut svm, &pid, &owner);
+    let pair = signed_commit(
+        &pid,
+        repo,
+        &owner,
+        [3u8; 32],
+        3,
+        [0u8; 32],
+        [0u8; 32],
+        system_program(),
+        system_program(),
+    );
+    let err = send(&mut svm, &owner, &pair).expect_err("parent_count 3");
+    assert_custom(6008, &err.err); // InvalidParentCount
+}
+
+#[test]
+fn create_commit_rejects_non_root_without_parent() {
+    let Some((mut svm, pid, owner)) = setup() else {
+        return;
+    };
+    let repo = init_repo(&mut svm, &pid, &owner);
+    // parent_count == 1 but parent_a is all-zero -> InvalidParent.
+    let pair = signed_commit(
+        &pid,
+        repo,
+        &owner,
+        [3u8; 32],
+        1,
+        [0u8; 32],
+        [0u8; 32],
+        system_program(),
+        system_program(),
+    );
+    let err = send(&mut svm, &owner, &pair).expect_err("missing parent");
+    assert_custom(6014, &err.err); // InvalidParent
+}
+
+#[test]
+fn create_commit_rejects_self_parent() {
+    let Some((mut svm, pid, owner)) = setup() else {
+        return;
+    };
+    let repo = init_repo(&mut svm, &pid, &owner);
+    let commit_oid = [3u8; 32];
+    let pair = signed_commit(
+        &pid,
+        repo,
+        &owner,
+        commit_oid,
+        1,
+        commit_oid,
+        [0u8; 32],
+        system_program(),
+        system_program(),
+    );
+    let err = send(&mut svm, &owner, &pair).expect_err("self parent");
+    assert_custom(6010, &err.err); // SelfParent
+}
+
+#[test]
+fn create_commit_rejects_unknown_parent_account() {
+    let Some((mut svm, pid, owner)) = setup() else {
+        return;
+    };
+    let repo = init_repo(&mut svm, &pid, &owner);
+    // Parent oid is non-zero, but the supplied account is not the commit PDA.
+    let pair = signed_commit(
+        &pid,
+        repo,
+        &owner,
+        [3u8; 32],
+        1,
+        [7u8; 32],
+        [0u8; 32],
+        system_program(),
+        system_program(),
+    );
+    let err = send(&mut svm, &owner, &pair).expect_err("unknown parent");
+    assert_custom(6004, &err.err); // InvalidPda
+}
+
+#[test]
+fn create_commit_rejects_zero_commit_oid() {
+    let Some((mut svm, pid, owner)) = setup() else {
+        return;
+    };
+    let repo = init_repo(&mut svm, &pid, &owner);
+    let pair = signed_commit(
+        &pid,
+        repo,
+        &owner,
+        [0u8; 32],
+        0,
+        [0u8; 32],
+        [0u8; 32],
+        system_program(),
+        system_program(),
+    );
+    let err = send(&mut svm, &owner, &pair).expect_err("zero commit oid");
+    assert_custom(6009, &err.err); // InvalidCommitOid
+}
+
+#[test]
+fn create_commit_rejects_unauthorized_author() {
+    let Some((mut svm, pid, owner)) = setup() else {
+        return;
+    };
+    let repo = init_repo(&mut svm, &pid, &owner);
+    let mallory = Keypair::new();
+    svm.airdrop(&mallory.pubkey(), 10_000_000_000)
+        .expect("airdrop");
+    let pair = signed_commit(
+        &pid,
+        repo,
+        &mallory,
+        [3u8; 32],
+        0,
+        [0u8; 32],
+        [0u8; 32],
+        system_program(),
+        system_program(),
+    );
+    let err = send(&mut svm, &mallory, &pair).expect_err("non-owner author");
+    assert_custom(6001, &err.err); // Unauthorized
+}
+
+#[test]
+fn create_commit_rejects_forged_author_signature() {
+    let Some((mut svm, pid, owner)) = setup() else {
+        return;
+    };
+    let repo = init_repo(&mut svm, &pid, &owner);
+    let mallory = Keypair::new();
+    let commit_oid = [3u8; 32];
+    let tree_oid = [4u8; 32];
+    let message_hash = [5u8; 32];
+    // Attestation + Ed25519 signed by Mallory, but the author account is owner.
+    let (attestation_hash, _) =
+        sample_attestation(&repo, &owner.pubkey(), commit_oid, tree_oid, message_hash);
+    let sig = mallory
+        .sign_message(&attestation_hash)
+        .as_ref()
+        .try_into()
+        .expect("signature length");
+    let ed_ix = ed25519_verify_instruction(&attestation_hash, &sig, &mallory.pubkey().to_bytes());
+    let forge_ix = create_commit_instruction(
+        &pid,
+        &owner.pubkey(),
+        repo,
+        commit_oid,
+        0,
+        [0u8; 32],
+        [0u8; 32],
+        tree_oid,
+        1_700_000_000,
+        message_hash,
+        attestation_hash,
+        system_program(),
+        system_program(),
+    );
+    let err = send(&mut svm, &owner, &[ed_ix, forge_ix]).expect_err("forged author");
+    assert_custom(6012, &err.err); // BadSignature
+}
+
+#[test]
+fn create_commit_rejects_multiple_ed25519_instructions() {
+    let Some((mut svm, pid, owner)) = setup() else {
+        return;
+    };
+    let repo = init_repo(&mut svm, &pid, &owner);
+    let commit_oid = [3u8; 32];
+    let tree_oid = [4u8; 32];
+    let message_hash = [5u8; 32];
+    let (attestation_hash, _) =
+        sample_attestation(&repo, &owner.pubkey(), commit_oid, tree_oid, message_hash);
+    let sig = owner
+        .sign_message(&attestation_hash)
+        .as_ref()
+        .try_into()
+        .expect("signature length");
+    let ed_ix = ed25519_verify_instruction(&attestation_hash, &sig, &owner.pubkey().to_bytes());
+    let other = [9u8; 32];
+    let sig2 = owner
+        .sign_message(&other)
+        .as_ref()
+        .try_into()
+        .expect("signature length");
+    let ed_ix2 = ed25519_verify_instruction(&other, &sig2, &owner.pubkey().to_bytes());
+    let forge_ix = create_commit_instruction(
+        &pid,
+        &owner.pubkey(),
+        repo,
+        commit_oid,
+        0,
+        [0u8; 32],
+        [0u8; 32],
+        tree_oid,
+        1_700_000_000,
+        message_hash,
+        attestation_hash,
+        system_program(),
+        system_program(),
+    );
+    let err = send(&mut svm, &owner, &[ed_ix, ed_ix2, forge_ix]).expect_err("two ed25519 ixs");
+    assert_custom(6013, &err.err); // InvalidEd25519Instruction
+}
+
+#[test]
+fn create_commit_compute_units_within_default_limit() {
+    let Some((mut svm, pid, owner)) = setup() else {
+        return;
+    };
+    let repo = init_repo(&mut svm, &pid, &owner);
+    let pair = signed_commit(
+        &pid,
+        repo,
+        &owner,
+        [3u8; 32],
+        0,
+        [0u8; 32],
+        [0u8; 32],
+        system_program(),
+        system_program(),
+    );
+    let meta = send(&mut svm, &owner, &pair).expect("create_commit");
+    let cu = meta.compute_units_consumed;
+    eprintln!("create_commit compute units (incl. Ed25519 precompile): {cu}");
+    assert!(
+        cu < 200_000,
+        "create_commit exceeded the default 200k CU limit: {cu}"
     );
 }
 

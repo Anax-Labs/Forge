@@ -145,3 +145,174 @@ fn parse_ed25519_instruction_data(
 const fn is_current_instruction_index(index: u16) -> bool {
     index == 0 || index == u16::MAX
 }
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::cast_possible_truncation)] // test message sizes are tiny
+
+    use super::*;
+
+    const HDR: usize = DATA_START;
+    const SIG_OFF: u16 = 16;
+    const PK_OFF: u16 = 80;
+    const MSG_OFF: u16 = 112;
+
+    #[allow(clippy::too_many_arguments)]
+    fn data_with(
+        sig_offset: u16,
+        pk_offset: u16,
+        msg_offset: u16,
+        msg_len: u16,
+        sig_ix: u16,
+        pk_ix: u16,
+        msg_ix: u16,
+        signature: [u8; 64],
+        pubkey: [u8; 32],
+        message: &[u8],
+    ) -> Vec<u8> {
+        let mut data = vec![1u8, 0u8];
+        data.extend_from_slice(&sig_offset.to_le_bytes());
+        data.extend_from_slice(&sig_ix.to_le_bytes());
+        data.extend_from_slice(&pk_offset.to_le_bytes());
+        data.extend_from_slice(&pk_ix.to_le_bytes());
+        data.extend_from_slice(&msg_offset.to_le_bytes());
+        data.extend_from_slice(&msg_len.to_le_bytes());
+        data.extend_from_slice(&msg_ix.to_le_bytes());
+        assert_eq!(data.len(), HDR);
+        data.extend_from_slice(&signature);
+        data.extend_from_slice(&pubkey);
+        data.extend_from_slice(message);
+        data
+    }
+
+    fn valid(author: &Pubkey, message: &[u8]) -> Vec<u8> {
+        data_with(
+            SIG_OFF,
+            PK_OFF,
+            MSG_OFF,
+            message.len() as u16,
+            u16::MAX,
+            u16::MAX,
+            u16::MAX,
+            [7u8; 64],
+            author.to_bytes(),
+            message,
+        )
+    }
+
+    fn author() -> Pubkey {
+        Pubkey::new_from_array([1u8; 32])
+    }
+
+    #[test]
+    fn accepts_matching_pubkey_and_message() {
+        let message = [2u8; 32];
+        let data = valid(&author(), &message);
+        assert!(parse_ed25519_instruction_data(&data, &author(), &message).is_ok());
+    }
+
+    #[test]
+    fn rejects_message_length_mismatch() {
+        let data = valid(&author(), &[2u8; 32]);
+        assert!(parse_ed25519_instruction_data(&data, &author(), &[3u8; 16]).is_err());
+    }
+
+    #[test]
+    fn rejects_wrong_pubkey() {
+        let message = [2u8; 32];
+        let data = valid(&author(), &message);
+        let other = Pubkey::new_from_array([9u8; 32]);
+        assert!(parse_ed25519_instruction_data(&data, &other, &message).is_err());
+    }
+
+    #[test]
+    fn rejects_wrong_message() {
+        let data = valid(&author(), &[2u8; 32]);
+        assert!(parse_ed25519_instruction_data(&data, &author(), &[3u8; 32]).is_err());
+    }
+
+    #[test]
+    fn rejects_zero_length_message() {
+        let data = data_with(
+            SIG_OFF,
+            PK_OFF,
+            MSG_OFF,
+            0,
+            u16::MAX,
+            u16::MAX,
+            u16::MAX,
+            [7u8; 64],
+            author().to_bytes(),
+            &[],
+        );
+        assert!(parse_ed25519_instruction_data(&data, &author(), &[]).is_err());
+    }
+
+    #[test]
+    fn rejects_offset_before_data_start() {
+        let message = [2u8; 32];
+        let data = data_with(
+            (HDR - 1) as u16,
+            PK_OFF,
+            MSG_OFF,
+            message.len() as u16,
+            u16::MAX,
+            u16::MAX,
+            u16::MAX,
+            [7u8; 64],
+            author().to_bytes(),
+            &message,
+        );
+        assert!(parse_ed25519_instruction_data(&data, &author(), &message).is_err());
+    }
+
+    #[test]
+    fn rejects_non_current_instruction_index() {
+        let message = [2u8; 32];
+        let data = data_with(
+            SIG_OFF,
+            PK_OFF,
+            MSG_OFF,
+            message.len() as u16,
+            5,
+            u16::MAX,
+            u16::MAX,
+            [7u8; 64],
+            author().to_bytes(),
+            &message,
+        );
+        assert!(parse_ed25519_instruction_data(&data, &author(), &message).is_err());
+    }
+
+    #[test]
+    fn rejects_all_zero_signature() {
+        let message = [2u8; 32];
+        let data = data_with(
+            SIG_OFF,
+            PK_OFF,
+            MSG_OFF,
+            message.len() as u16,
+            u16::MAX,
+            u16::MAX,
+            u16::MAX,
+            [0u8; 64],
+            author().to_bytes(),
+            &message,
+        );
+        assert!(parse_ed25519_instruction_data(&data, &author(), &message).is_err());
+    }
+
+    #[test]
+    fn rejects_truncated_data() {
+        let data = vec![1u8, 0u8];
+        assert!(parse_ed25519_instruction_data(&data, &author(), &[0u8; 32]).is_err());
+    }
+
+    #[test]
+    fn rejects_bad_header_padding() {
+        let message = [2u8; 32];
+        let mut data = valid(&author(), &message);
+        data[1] = 1; // padding byte must be 0
+        assert!(parse_ed25519_instruction_data(&data, &author(), &message).is_err());
+    }
+}

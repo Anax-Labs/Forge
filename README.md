@@ -57,19 +57,19 @@ bash tests/run.sh
 
 ## Program ID
 
-`Anchor.toml` and `declare_id!` are set to the localnet program ID
-`4smCAEoycSXSvVsyic8ircQmHmENPCHn17Fma83SYVbf`. The matching keypair lives at
-`target/deploy/forge_repository-keypair.json` and is **git-ignored** (never
-commit keypairs).
+The canonical program ID is **`4smCAEoycSXSvVsyic8ircQmHmENPCHn17Fma83SYVbf`**,
+and `declare_id!`, `[programs.localnet]`, and `[programs.devnet]` all use it.
 
-On a fresh clone where `target/` is empty, run:
+The matching keypair lives at `target/deploy/forge_repository-keypair.json` and
+is **git-ignored** (never commit keypairs).
 
-```bash
-anchor keys sync   # regenerates the keypair and updates Anchor.toml + declare_id!
-```
-
-The devnet program ID is a placeholder until the program is first deployed
-(Phase 8); once deployed, update `[programs.devnet]` in `Anchor.toml`.
+- **Building and testing need no keypair.** `anchor build` and the LiteSVM tests
+  use `declare_id!`, so a fresh clone works as-is even though `target/` is empty.
+- **Do not run `anchor keys sync`.** It regenerates a keypair and rewrites
+  `declare_id!` / `Anchor.toml`, changing the program ID (this is how the ID
+  drifted before). The ID must stay stable.
+- **Deploying** requires the canonical keypair at the path above; obtain it
+  out-of-band from the team and restore it before `anchor deploy`.
 
 ## Documentation
 

@@ -8,7 +8,7 @@ skip-lint = false
 forge_repository = "4smCAEoycSXSvVsyic8ircQmHmENPCHn17Fma83SYVbf"
 
 [programs.localnet]
-forge_repository = "GDvJ2gS2epXZdCfv2PB13ogJAHoJsNMm2ogLk9664Pje"
+forge_repository = "4smCAEoycSXSvVsyic8ircQmHmENPCHn17Fma83SYVbf"
 
 [provider]
 cluster = "localnet"
