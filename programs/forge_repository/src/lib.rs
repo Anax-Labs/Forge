@@ -38,6 +38,8 @@ pub mod name;
 pub mod pda;
 pub mod state;
 
+mod init;
+
 use anchor_lang::prelude::*;
 
 // Bring instruction account structs to the crate root, which is where Anchor's
@@ -82,17 +84,20 @@ pub mod forge_repository {
 
     /// Creates a branch ref from an existing commit or from empty (§9.2, §7.2).
     ///
+    /// The signing `authority` account becomes the branch's recorded update
+    /// authority.
+    ///
     /// # Errors
     /// Returns [`errors::ForgeError::InvalidName`],
-    /// [`errors::ForgeError::Unauthorized`], or
+    /// [`errors::ForgeError::Unauthorized`],
+    /// [`errors::ForgeError::BranchAlreadyExists`], or
     /// [`errors::ForgeError::UnknownCommit`] as documented on the handler.
     pub fn create_branch(
         ctx: Context<CreateBranch>,
         name: [u8; 32],
         from_commit: [u8; 32],
-        authority: Pubkey,
     ) -> Result<()> {
-        instructions::create_branch::handler(ctx, name, from_commit, authority)
+        instructions::create_branch::handler(ctx, name, from_commit)
     }
 
     /// Anchors a wallet-signed commit and advances the repository history root (§9.2).

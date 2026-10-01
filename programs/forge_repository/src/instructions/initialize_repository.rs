@@ -5,12 +5,18 @@
 //! `BranchAccount` exists at its own PDA head pointing at the all-zero oid.
 //!
 //! The default branch account is created here (atomically) rather than by a
-//! separate call so a repository is always usable in one transaction. Anchor
-//! `init` is used for both accounts; `init_if_needed` is forbidden (§9.2).
+//! separate call so a repository is always usable in one transaction.
+//!
+//! Accounts are created with the guarded helper in [`crate::init`] rather than
+//! Anchor `#[account(init)]`, so a duplicate name for the same owner returns
+//! [`ForgeError::RepositoryAlreadyExists`] instead of the generic
+//! system-program error. The address of each account is still pinned by a
+//! `seeds` + `bump` constraint, and reinitialization is rejected.
 
 use crate::constants::{BRANCH_SEED, PERMISSIONS_MODE_OWNER_ONLY, REPO_SEED, STORAGE_BACKEND_MAX};
 use crate::errors::ForgeError;
 use crate::events::RepositoryInitialized;
+use crate::init::create_pda;
 use crate::name::validate_name;
 use crate::state::{BranchAccount, RepositoryAccount};
 use anchor_lang::prelude::*;
@@ -29,24 +35,28 @@ pub struct InitializeRepository<'info> {
     pub owner: Signer<'info>,
 
     /// The repository PDA: `["repo", owner, name]`.
+    ///
+    /// CHECK: created in the handler via [`create_pda`] so duplicate creation
+    /// returns [`ForgeError::RepositoryAlreadyExists`]. The address is pinned by
+    /// the seeds constraint and the account is validated by `create_account`.
     #[account(
-        init,
-        payer = owner,
-        space = 8 + RepositoryAccount::LEN,
+        mut,
         seeds = [REPO_SEED, owner.key().as_ref(), name.as_ref()],
         bump
     )]
-    pub repository: Account<'info, RepositoryAccount>,
+    pub repository: UncheckedAccount<'info>,
 
     /// The empty default branch: `["branch", repository, default_branch]`.
+    ///
+    /// CHECK: created in the handler via [`create_pda`] so duplicate creation
+    /// returns [`ForgeError::BranchAlreadyExists`]. Pinned by the seeds
+    /// constraint.
     #[account(
-        init,
-        payer = owner,
-        space = 8 + BranchAccount::LEN,
+        mut,
         seeds = [BRANCH_SEED, repository.key().as_ref(), default_branch.as_ref()],
         bump
     )]
-    pub default_branch_account: Account<'info, BranchAccount>,
+    pub default_branch_account: UncheckedAccount<'info>,
 
     /// System program (account creation).
     pub system_program: Program<'info, System>,
@@ -57,6 +67,8 @@ pub struct InitializeRepository<'info> {
 /// # Errors
 /// - [`ForgeError::InvalidName`] if either name is malformed.
 /// - [`ForgeError::InvalidStorageBackend`] if the backend tag is unknown.
+/// - [`ForgeError::RepositoryAlreadyExists`] / [`ForgeError::BranchAlreadyExists`]
+///   if the PDA is already initialized.
 pub fn handler(
     ctx: Context<InitializeRepository>,
     name: [u8; 32],
@@ -81,33 +93,61 @@ pub fn handler(
     let history_root =
         genesis_history_root(&repo_key.to_bytes(), HashAlgorithm::Sha256).to_bytes32();
 
-    {
-        let repository = &mut ctx.accounts.repository;
-        repository.owner = owner_key;
-        repository.repo_id = repo_key;
-        repository.name = name;
-        repository.default_branch = default_branch;
-        repository.history_root = history_root;
-        repository.commit_count = 0;
-        repository.contributor_count = 0;
-        repository.storage_backend = storage_backend;
-        repository.flags = flags;
-        repository.bump = ctx.bumps.repository;
-        repository.created_slot = slot;
-    }
+    let repository = RepositoryAccount {
+        owner: owner_key,
+        repo_id: repo_key,
+        name,
+        default_branch,
+        history_root,
+        commit_count: 0,
+        contributor_count: 0,
+        storage_backend,
+        flags,
+        bump: ctx.bumps.repository,
+        created_slot: slot,
+        _reserved: [0u8; 64],
+    };
+    let repo_seeds: &[&[u8]] = &[
+        REPO_SEED,
+        owner_key.as_ref(),
+        name.as_ref(),
+        &[ctx.bumps.repository],
+    ];
+    create_pda(
+        &ctx.accounts.owner.to_account_info(),
+        &ctx.accounts.repository.to_account_info(),
+        repo_seeds,
+        8 + RepositoryAccount::LEN,
+        ForgeError::RepositoryAlreadyExists,
+        &repository,
+    )?;
 
-    {
-        let branch = &mut ctx.accounts.default_branch_account;
-        branch.repo = repo_key;
-        branch.name = default_branch;
-        branch.head_commit = [0u8; 32];
-        branch.head_seq = 0;
-        branch.authority = owner_key;
-        branch.permissions_mode = PERMISSIONS_MODE_OWNER_ONLY;
-        branch.protected = 0;
-        branch.bump = ctx.bumps.default_branch_account;
-        branch.updated_slot = slot;
-    }
+    let branch = BranchAccount {
+        repo: repo_key,
+        name: default_branch,
+        head_commit: [0u8; 32],
+        head_seq: 0,
+        authority: owner_key,
+        permissions_mode: PERMISSIONS_MODE_OWNER_ONLY,
+        protected: 0,
+        bump: ctx.bumps.default_branch_account,
+        updated_slot: slot,
+        _reserved: [0u8; 32],
+    };
+    let branch_seeds: &[&[u8]] = &[
+        BRANCH_SEED,
+        repo_key.as_ref(),
+        default_branch.as_ref(),
+        &[ctx.bumps.default_branch_account],
+    ];
+    create_pda(
+        &ctx.accounts.owner.to_account_info(),
+        &ctx.accounts.default_branch_account.to_account_info(),
+        branch_seeds,
+        8 + BranchAccount::LEN,
+        ForgeError::BranchAlreadyExists,
+        &branch,
+    )?;
 
     emit_cpi!(RepositoryInitialized {
         repository: repo_key,

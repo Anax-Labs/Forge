@@ -37,7 +37,10 @@ custom merge engine, general rule VM, onchain file storage.
   program owner, discriminator, PDA, repository binding, and oid.
 - **Log injection:** events are emitted via `emit_cpi!` call data, never parsed
   from string logs (ADR 0001, §11 #12).
-- **Reinitialization / revival:** `init` only; `init_if_needed` is forbidden.
-  Duplicate repository/branch creation fails at account init.
-- **Overflow:** any future arithmetic will use checked math; no unbounded
-  arithmetic exists yet.
+- **Reinitialization / revival:** PDA accounts are created through the guarded
+  `create_pda` helper, which rejects a non-empty account before creating it, and
+  addresses are pinned by `seeds` + `bump`. `init_if_needed` is forbidden.
+  Duplicate repository/branch creation returns `RepositoryAlreadyExists` /
+  `BranchAlreadyExists`.
+- **Overflow:** no arithmetic exists yet; checked math is introduced with the
+  first arithmetic in Phase 4.

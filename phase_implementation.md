@@ -180,6 +180,34 @@ Repository + default branch can be created and read back on a local validator; e
 - PDA seed length limits (≤16 seeds, ≤32 bytes each, §2.3) constrain name padding (`[u8;32]`/`[u8;64]`) — reconcile before freezing.
 - Whether `PermissionAccount` ships in MVP or is deferred (§4.6 says MVP may inline a small allowlist).
 
+### Review Findings Resolved (post-implementation)
+
+A post-implementation review of Phase 3 found the following minor issues; all
+are resolved or explicitly deferred as noted.
+
+1. **Declared-but-unused errors** (`BranchAlreadyExists` 6003,
+   `RepositoryAlreadyExists` 6005, `MathOverflow` 6007). *Resolved:* accounts are
+   now created through a guarded manual helper (`src/init.rs`) that returns
+   6005/6003, so duplicate creation has protocol-specific codes. `MathOverflow`
+   was removed and is re-added in Phase 4 with the first checked arithmetic.
+2. **Valid `from_commit` branch path untested.** *Resolved:* added
+   `create_branch_accepts_existing_commit`, which fabricates a `CommitAccount`
+   PDA and asserts the branch head. The LiteSVM harness now expires the
+   blockhash per transaction to avoid `AlreadyProcessed` on identical sends.
+3. **Documented deviations** (32-byte names instead of `[u8;64]`; printable-ASCII
+   names). *No change:* already documented in ADR 0002.
+4. **`create_branch` signer named `signer`** while §9.2 calls it `authority`.
+   *Resolved:* account renamed to `authority`; the redundant `authority`
+   instruction arg was dropped, so the IDL now matches §9.2
+   (`create_branch(name, from_commit)`, accounts `authority, repository, branch,
+   system_program, event_authority, program`).
+5. **No onchain getter instruction.** *Resolved/clarified:* read-only access is
+   by account deserialization (standard Solana); documented in ADR 0003.
+6. **SBF binary grew to ~275 KB** after linking `forge-object`. *Deferred:*
+   accepted for now; size/compute budget to be watched in Phase 4.
+7. **`system_program` account is now unused by the manual-init handler.**
+   *Accepted:* retained for interface stability and Anchor convention.
+
 ---
 
 ## Phase 4 — Onchain Commit Creation & Ed25519 Authorship Verification

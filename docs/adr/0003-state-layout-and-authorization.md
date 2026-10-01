@@ -23,16 +23,42 @@ account types get instructions now.
 | `PermissionAccount` | 82 | struct only until Phase 9 |
 | `ProgramSourceAttestation` | 202 | struct only until Phase 9 |
 
-`space = 8 + T::LEN` for `init`. Fixed-size fields come first; `_reserved`
-headroom is trailing so fields can be appended without a layout break.
-`RepositoryAccount.repo_id` denormalizes the PDA for indexers.
+`space = 8 + T::LEN` for initialization. Fixed-size fields come first;
+`_reserved` headroom is trailing so fields can be appended without a layout
+break. `RepositoryAccount.repo_id` denormalizes the PDA for indexers.
+
+### Initialization: guarded manual create
+
+PDA accounts are created by the `create_pda` helper (`src/init.rs`) rather than
+Anchor `#[account(init)]`. Anchor `init` is robust but reports duplicates with
+the system program's generic `AccountAlreadyInUse`; Forge requires
+protocol-specific errors (`RepositoryAlreadyExists`, `BranchAlreadyExists`) so
+clients can tell "this name is taken" from other failures. The helper:
+
+- rejects a non-empty account with the caller's error (reinitialization guard),
+- creates the account via `system_program::create_account` with `space = 8 + LEN`
+  and the program as owner, and
+- serializes the account state.
+
+The address of every such account is still pinned by a `seeds` + `bump`
+constraint on an `UncheckedAccount`, so it cannot be substituted, and
+`init_if_needed` remains forbidden.
 
 ### Authorization
 
 MVP is **owner-only**. `auth::require_repo_owner` compares the signer to
-`RepositoryAccount.owner`. `BranchAccount.authority` is recorded but not yet
-enforced. Phase 9 adds `permissions_mode = 1` (allowlist) and `= 2`
-(program-owned authority PDA, §16.2).
+`RepositoryAccount.owner`. In `create_branch` the signer account is named
+`authority` (matching §9.2) and becomes the branch's recorded update authority;
+it is not yet possible to differ from the owner. Phase 9 adds
+`permissions_mode = 1` (allowlist) and `= 2` (program-owned authority PDA,
+§16.2).
+
+### Read-only access
+
+There are no getter instructions. Repository and branch state is read by
+deserializing the account at its deterministic PDA (the standard Solana model);
+the account structs are public and exported, and the IDL describes their
+layouts. Tests assert the stored fields directly.
 
 ### Scope
 
@@ -44,8 +70,10 @@ enforced. Phase 9 adds `permissions_mode = 1` (allowlist) and `= 2`
   §9.2, enabled by `#[instruction(...)]` seeds (ADR 0002).
 - Canonical PDA bumps are stored in each account (§11 bump canonicalization).
 - `create_branch` accepts an optional existing commit via `remaining_accounts`
-  when `from_commit != 0`; Phase 3 has no commits, so only the empty path is
-  exercised until Phase 4.
+  when `from_commit != 0`; the success path is covered by `tests/phase3.rs` using
+  a fabricated `CommitAccount`, and the real producer lands in Phase 4.
+- Checked-math / overflow error handling is deferred until Phase 4 introduces
+  arithmetic; there is no arithmetic in Phase 3.
 
 ## Consequences
 
@@ -53,3 +81,5 @@ enforced. Phase 9 adds `permissions_mode = 1` (allowlist) and `= 2`
 - Instructions inherit `event_authority` + `program` accounts from ADR 0001.
 - Exact byte sizes are asserted in `tests/phase3.rs`; changing `LEN` without a
   migration is a protocol break.
+- Duplicate repository/branch creation returns a stable Forge error code
+  (6005 / 6003) instead of the generic system error.

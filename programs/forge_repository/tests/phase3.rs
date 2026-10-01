@@ -11,16 +11,19 @@
 //! (events), §9.2 (`initialize_repository`/`create_branch`), §7.2 (branch
 //! creation), §16.4 (owner-only MVP auth).
 
-use anchor_lang::{AccountDeserialize, AnchorDeserialize, Discriminator};
+use anchor_lang::prelude::Pubkey;
+use anchor_lang::{AccountDeserialize, AccountSerialize, AnchorDeserialize, Discriminator};
 use litesvm::LiteSVM;
 use solana_keypair::Keypair;
 use solana_message::{AccountMeta, Address, Instruction, Message};
 use solana_signer::Signer;
 use solana_transaction::Transaction;
 
-use forge_repository::constants::{BRANCH_SEED, PERMISSIONS_MODE_OWNER_ONLY, REPO_SEED};
+use forge_repository::constants::{
+    BRANCH_SEED, COMMIT_SEED, PERMISSIONS_MODE_OWNER_ONLY, REPO_SEED,
+};
 use forge_repository::events::{BranchCreated, RepositoryInitialized};
-use forge_repository::state::{BranchAccount, RepositoryAccount};
+use forge_repository::state::{BranchAccount, CommitAccount, RepositoryAccount};
 
 const SYSTEM_PROGRAM: &str = "11111111111111111111111111111111";
 
@@ -114,11 +117,10 @@ fn initialize_instruction(
 
 fn create_branch_instruction(
     pid: &Address,
-    signer: &Address,
+    authority: &Address,
     repository: Address,
     branch_name: [u8; 32],
     from_commit: [u8; 32],
-    authority: Address,
 ) -> Instruction {
     let (branch, _) = Address::find_program_address(
         &[BRANCH_SEED, repository.as_ref(), branch_name.as_ref()],
@@ -128,12 +130,11 @@ fn create_branch_instruction(
     data.extend_from_slice(&disc("create_branch"));
     data.extend_from_slice(&branch_name);
     data.extend_from_slice(&from_commit);
-    data.extend_from_slice(authority.as_ref());
 
     Instruction {
         program_id: *pid,
         accounts: vec![
-            AccountMeta::new(*signer, true),
+            AccountMeta::new(*authority, true),
             AccountMeta::new_readonly(repository, false),
             AccountMeta::new(branch, false),
             AccountMeta::new_readonly(system_program(), false),
@@ -142,6 +143,29 @@ fn create_branch_instruction(
         ],
         data,
     }
+}
+
+/// Builds the serialized `CommitAccount` data (discriminator + body) for a
+/// fabricated commit, so the `from_commit` path can be exercised before
+/// `create_commit` exists (Phase 4).
+fn commit_account_data(repo: Address, commit_oid: [u8; 32], author: Address) -> Vec<u8> {
+    let commit = CommitAccount {
+        repo: Pubkey::new_from_array(repo.to_bytes()),
+        commit_oid,
+        parent_count: 0,
+        parent_a: [0u8; 32],
+        parent_b: [0u8; 32],
+        tree_oid: [1u8; 32],
+        author: Pubkey::new_from_array(author.to_bytes()),
+        authored_at: 0,
+        message_hash: [2u8; 32],
+        attestation_hash: [3u8; 32],
+        seq: 0,
+        bump: 0,
+    };
+    let mut data = Vec::new();
+    commit.try_serialize(&mut data).expect("serialize commit");
+    data
 }
 
 fn repo_address(pid: &Address, owner: &Address, repo_name: &[u8; 32]) -> Address {
@@ -165,6 +189,9 @@ fn send(
     litesvm::types::TransactionMetadata,
     litesvm::types::FailedTransactionMetadata,
 > {
+    // Advance to a fresh blockhash so repeated identical instructions (for
+    // example, a duplicate init) are not rejected as AlreadyProcessed.
+    svm.expire_blockhash();
     let blockhash = svm.latest_blockhash();
     let tx = Transaction::new_signed_with_payer(
         &[instruction],
@@ -289,14 +316,7 @@ fn create_branch_creates_named_branch() {
     let repo_addr = repo_address(&pid, &owner.pubkey(), &repo_name);
 
     let feature = name("feature/x");
-    let ix = create_branch_instruction(
-        &pid,
-        &owner.pubkey(),
-        repo_addr,
-        feature,
-        [0u8; 32],
-        owner.pubkey(),
-    );
+    let ix = create_branch_instruction(&pid, &owner.pubkey(), repo_addr, feature, [0u8; 32]);
     let meta = send(&mut svm, &owner, ix).expect("create_branch should succeed");
 
     let branch_addr = branch_address(&pid, &repo_addr, &feature);
@@ -355,8 +375,13 @@ fn initialize_rejects_duplicate_repository() {
     send(&mut svm, &owner, ix).expect("first init");
 
     let ix = initialize_instruction(&pid, &owner.pubkey(), name("forge"), name("main"), 2, 0);
-    let result = send(&mut svm, &owner, ix);
-    assert!(result.is_err(), "second init at same PDA must fail");
+    let err = send(&mut svm, &owner, ix).expect_err("second init at same PDA must fail");
+    assert_eq!(
+        custom_error_code(&err.err),
+        Some(6005),
+        "expected ForgeError::RepositoryAlreadyExists (6005), got {:?}",
+        err.err
+    );
 }
 
 #[test]
@@ -370,14 +395,8 @@ fn create_branch_rejects_non_owner() {
 
     let mallory = Keypair::new();
     svm.airdrop(&mallory.pubkey(), 10 * 1_000_000_000).unwrap();
-    let ix = create_branch_instruction(
-        &pid,
-        &mallory.pubkey(),
-        repo_addr,
-        name("steal"),
-        [0u8; 32],
-        mallory.pubkey(),
-    );
+    let ix =
+        create_branch_instruction(&pid, &mallory.pubkey(), repo_addr, name("steal"), [0u8; 32]);
     let err = send(&mut svm, &mallory, ix).expect_err("non-owner must be rejected");
     assert_eq!(
         custom_error_code(&err.err),
@@ -397,17 +416,13 @@ fn create_branch_rejects_duplicate_name() {
     let repo_addr = repo_address(&pid, &owner.pubkey(), &name("forge"));
 
     // The default branch already occupies ("branch", repo, "main").
-    let ix = create_branch_instruction(
-        &pid,
-        &owner.pubkey(),
-        repo_addr,
-        name("main"),
-        [0u8; 32],
-        owner.pubkey(),
-    );
-    assert!(
-        send(&mut svm, &owner, ix).is_err(),
-        "duplicate branch PDA must fail to init"
+    let ix = create_branch_instruction(&pid, &owner.pubkey(), repo_addr, name("main"), [0u8; 32]);
+    let err = send(&mut svm, &owner, ix).expect_err("duplicate branch must fail");
+    assert_eq!(
+        custom_error_code(&err.err),
+        Some(6003),
+        "expected ForgeError::BranchAlreadyExists (6003), got {:?}",
+        err.err
     );
 }
 
@@ -421,14 +436,7 @@ fn create_branch_requires_commit_account_when_from_commit_nonzero() {
     let repo_addr = repo_address(&pid, &owner.pubkey(), &name("forge"));
 
     // Non-zero from_commit with no remaining account supplied.
-    let ix = create_branch_instruction(
-        &pid,
-        &owner.pubkey(),
-        repo_addr,
-        name("dev"),
-        [9u8; 32],
-        owner.pubkey(),
-    );
+    let ix = create_branch_instruction(&pid, &owner.pubkey(), repo_addr, name("dev"), [9u8; 32]);
     let err = send(&mut svm, &owner, ix).expect_err("missing commit account must fail");
     assert_eq!(
         custom_error_code(&err.err),
@@ -448,14 +456,8 @@ fn create_branch_rejects_wrong_commit_account() {
     let repo_addr = repo_address(&pid, &owner.pubkey(), &name("forge"));
 
     // Non-zero from_commit with an account that is not the canonical commit PDA.
-    let mut ix = create_branch_instruction(
-        &pid,
-        &owner.pubkey(),
-        repo_addr,
-        name("dev"),
-        [9u8; 32],
-        owner.pubkey(),
-    );
+    let mut ix =
+        create_branch_instruction(&pid, &owner.pubkey(), repo_addr, name("dev"), [9u8; 32]);
     ix.accounts.push(AccountMeta::new_readonly(
         Address::new_from_array([42u8; 32]),
         false,
@@ -467,6 +469,46 @@ fn create_branch_rejects_wrong_commit_account() {
         "expected ForgeError::InvalidPda (6004), got {:?}",
         err.err
     );
+}
+
+#[test]
+fn create_branch_accepts_existing_commit() {
+    let Some((mut svm, pid, owner)) = setup() else {
+        return;
+    };
+    let ix = initialize_instruction(&pid, &owner.pubkey(), name("forge"), name("main"), 2, 0);
+    send(&mut svm, &owner, ix).expect("initialize");
+    let repo_addr = repo_address(&pid, &owner.pubkey(), &name("forge"));
+
+    // Fabricate the CommitAccount that `create_commit` will create in Phase 4.
+    let commit_oid = [9u8; 32];
+    let (commit_addr, _) = Address::find_program_address(
+        &[COMMIT_SEED, repo_addr.as_ref(), commit_oid.as_ref()],
+        &pid,
+    );
+    let mut commit_account = svm
+        .get_account(&owner.pubkey())
+        .expect("owner account as template");
+    commit_account.lamports = 10_000_000;
+    commit_account.data = commit_account_data(repo_addr, commit_oid, owner.pubkey());
+    commit_account.owner = pid;
+    commit_account.executable = false;
+    commit_account.rent_epoch = 0;
+    svm.set_account(commit_addr, commit_account)
+        .expect("install commit account");
+
+    let mut ix =
+        create_branch_instruction(&pid, &owner.pubkey(), repo_addr, name("dev"), commit_oid);
+    ix.accounts
+        .push(AccountMeta::new_readonly(commit_addr, false));
+    send(&mut svm, &owner, ix).expect("branch from existing commit should succeed");
+
+    let branch_addr = branch_address(&pid, &repo_addr, &name("dev"));
+    let acct = svm.get_account(&branch_addr).expect("branch exists");
+    let branch = BranchAccount::try_deserialize(&mut acct.data.as_slice()).unwrap();
+    assert_eq!(branch.head_commit, commit_oid);
+    assert_eq!(branch.head_seq, 0);
+    assert_eq!(branch.authority.to_bytes(), owner.pubkey().to_bytes());
 }
 
 // ---------------------------------------------------------------------------
