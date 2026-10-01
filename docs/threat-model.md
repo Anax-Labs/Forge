@@ -66,3 +66,21 @@ custom merge engine, general rule VM, onchain file storage.
   `UnknownCommit`, `InvalidPda`, `RootOnNonemptyRepo`).
 - **Compute budget:** `create_commit` ≈ 32.7k CU including the precompile,
   asserted `< 200_000` in `create_commit_compute_units_within_default_limit`.
+
+## Phase 5 status (implemented)
+
+- **Unauthorized branch update:** `update_branch` / `reset_branch` / `merge`
+  require the repository owner and a wallet signature over a domain-separated
+  branch message (`src/refs.rs`, `forge_object::branch`, ADR 0005). Non-owner →
+  `Unauthorized`; wrong signature → `BadSignature`.
+- **Replay:** every head move is a compare-and-swap on `head_seq`; a replayed or
+  racing update fails with `StaleBranchHead` (§7.4). Update and reset use
+  different domains so an update signature cannot authorize a rewrite.
+- **History rewrite:** `reset_branch` is a distinct, logged instruction that
+  emits `BranchReset` and never modifies the append-only `history_root`; a test
+  asserts the root is unchanged (§11 #4/#9).
+- **Malicious merge:** a merge commit must have exactly two parents matching the
+  current target and source heads, or it is rejected (`InvalidMerge`).
+- **Accidental ref deletion:** deleting the default branch is forbidden
+  (`CannotDeleteDefaultBranch`); deleting another branch closes its account and
+  emits `BranchDeleted`.

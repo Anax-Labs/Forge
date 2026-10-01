@@ -70,4 +70,20 @@ pub enum ForgeError {
     /// Parent oid arguments or accounts are inconsistent (§6.4).
     #[msg("invalid parent commit reference")]
     InvalidParent,
+
+    /// `expected_head_seq` does not match the branch's current `head_seq` (§7.4).
+    #[msg("stale branch head; refetch and retry")]
+    StaleBranchHead,
+
+    /// A branch update is not a fast-forward and no reset was requested (§7.3).
+    #[msg("non-fast-forward branch update")]
+    NonFastForward,
+
+    /// Merge commit parents do not match the target and source branch heads (§6.6).
+    #[msg("invalid merge: parents do not match branch heads")]
+    InvalidMerge,
+
+    /// The default branch cannot be deleted (§7.2).
+    #[msg("the default branch cannot be deleted")]
+    CannotDeleteDefaultBranch,
 }

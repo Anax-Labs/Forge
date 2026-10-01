@@ -1,40 +1,38 @@
-//! `update_branch` — fast-forward or merge a branch head (§9.2, §7.2, §7.4).
+//! `reset_branch` — explicit, logged non-fast-forward branch rewrite (§7.3).
 //!
-//! The only mutable ref path in the protocol. Concurrency is controlled by
-//! comparing `expected_head_seq` to the stored `head_seq` (optimistic
-//! concurrency), so racing pushes are resolved by a compare-and-swap: the loser
-//! must refetch, rebase locally, re-sign, and retry (§7.4).
-//!
-//! The update is authorized by a wallet signature over
-//! [`forge_object::branch::branch_update_message`] binding the repository,
-//! branch name, new head, and expected sequence.
+//! A reset moves a branch head to a commit that is **not** a descendant, e.g.
+//! after a local rebase. It is deliberately a distinct instruction from
+//! [`crate::forge_repository::update_branch`] so history rewrites are visible:
+//! it emits [`crate::events::BranchReset`] and never touches the append-only
+//! repository `history_root` (§11 #4/#9). MVP authorization is owner-only;
+//! Phase 9 restricts it to maintainer/admin roles.
 
 use anchor_lang::prelude::*;
-use forge_object::{branch::branch_update_message, HashAlgorithm, Oid};
+use forge_object::{branch::branch_reset_message, HashAlgorithm, Oid};
 
 use crate::constants::{ED25519_PROGRAM_ID, INSTRUCTIONS_SYSVAR_ID};
 use crate::ed25519::verify_ed25519_instruction_preceding;
 use crate::errors::ForgeError;
-use crate::events::BranchUpdated;
-use crate::refs::{is_fast_forward_or_merge, load_commit, require_branch_binding};
+use crate::events::BranchReset;
+use crate::refs::{load_commit, require_branch_binding};
 use crate::state::{BranchAccount, RepositoryAccount};
 
-/// Accounts for [`crate::forge_repository::update_branch`].
+/// Accounts for [`crate::forge_repository::reset_branch`].
 #[event_cpi]
 #[derive(Accounts)]
 #[instruction(new_head: [u8; 32], expected_head_seq: u64)]
-pub struct UpdateBranch<'info> {
-    /// Branch update authority (MVP: the repository owner).
+pub struct ResetBranch<'info> {
+    /// Reset authority (MVP: the repository owner).
     pub authority: Signer<'info>,
 
     /// Repository the branch belongs to.
     pub repository: Account<'info, RepositoryAccount>,
 
-    /// The branch to advance; must be the canonical `["branch", repo, name]` PDA.
+    /// The branch to reset; must be the canonical `["branch", repo, name]` PDA.
     #[account(mut)]
     pub branch: Account<'info, BranchAccount>,
 
-    /// New head commit account.
+    /// New head commit (need not descend from the current head).
     /// CHECK: validated in the handler (canonical PDA, repository, oid).
     pub new_commit: UncheckedAccount<'info>,
 
@@ -49,19 +47,18 @@ pub struct UpdateBranch<'info> {
     pub ed25519_program: UncheckedAccount<'info>,
 }
 
-/// Handler for `update_branch`.
+/// Handler for `reset_branch`.
 ///
 /// # Errors
 /// - [`ForgeError::Unauthorized`] if the authority is not the repository owner.
 /// - [`ForgeError::InvalidPda`] / [`ForgeError::UnknownCommit`] for a bad branch
 ///   or commit account.
 /// - [`ForgeError::StaleBranchHead`] if `expected_head_seq` is out of date.
-/// - [`ForgeError::NonFastForward`] if the new head is not a descendant/merge.
 /// - [`ForgeError::InvalidEd25519Instruction`] / [`ForgeError::BadSignature`]
 ///   if the authorization signature is missing or wrong.
 /// - [`ForgeError::MathOverflow`] on `head_seq` overflow.
 pub fn handler(
-    ctx: Context<UpdateBranch>,
+    ctx: Context<ResetBranch>,
     new_head: [u8; 32],
     expected_head_seq: u64,
 ) -> Result<()> {
@@ -82,16 +79,13 @@ pub fn handler(
     };
 
     require!(new_head != [0u8; 32], ForgeError::InvalidCommitOid);
+    // The reset target must still be a real commit of this repository.
     let new_commit_info = ctx.accounts.new_commit.to_account_info();
-    let commit = load_commit(&repo_key, &new_head, &new_commit_info)?;
-    require!(
-        is_fast_forward_or_merge(&old_head, &commit),
-        ForgeError::NonFastForward
-    );
+    let _commit = load_commit(&repo_key, &new_head, &new_commit_info)?;
 
     let new_head_oid = Oid::new(HashAlgorithm::Sha256, new_head.to_vec())
         .map_err(|_| error!(ForgeError::InvalidCommitOid))?;
-    let message = branch_update_message(
+    let message = branch_reset_message(
         &repo_key.to_bytes(),
         &branch_name,
         &new_head_oid,
@@ -111,7 +105,7 @@ pub fn handler(
         .ok_or(ForgeError::MathOverflow)?;
     branch.updated_slot = slot;
 
-    emit_cpi!(BranchUpdated {
+    emit_cpi!(BranchReset {
         repository: repo_key,
         name: branch_name,
         old_head,

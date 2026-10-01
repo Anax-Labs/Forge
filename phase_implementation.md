@@ -342,6 +342,25 @@ All §7.2 operations implemented with tests; CAS and replay protections verified
 - `reset_branch` is a design extension beyond the MVP MUST list; confirm it is in hackathon scope or mark SHOULD.
 - Whether `merge` belongs to MVP MUST or SHOULD (§19.1 lists only create/update branch; §19.2 lists `forge merge`) — program support here; CLI can be Phase 9.
 
+### Status (implemented)
+
+- **Instructions:** `update_branch` (CAS + fast-forward/merge), `reset_branch`
+  (logged non-fast-forward, history preserved), `merge` (two-parent topology),
+  `delete_branch` (default protected, rent refunded).
+- **Signed messages:** `forge_object::branch::{branch_update_message,
+  branch_reset_message}` — domain-separated, binding repo/name/new-head/seq. The
+  §9.2 `auth_nonce` argument is intentionally omitted (the `head_seq` CAS already
+  prevents replay). See ADR 0005.
+- **Source-branch decision (Open Question #12):** `merge` takes the source branch
+  as an explicit `Account<BranchAccount>` rather than `remaining_accounts`.
+- **Events:** `BranchUpdated`, `BranchReset`, `BranchDeleted`.
+- **Tests:** first-set, fast-forward, stale head/replay, non-fast-forward,
+  unauthorized, forged signature, non-FF reset (history root unchanged),
+  merge success, mismatched merge parents, default-branch delete protection.
+- **Bug fixed:** `CommitAccount` deserialization passed the body without the
+  discriminator (latent in Phase 4 for real parent chains); corrected in both
+  `create_commit` and `refs::load_commit`, with a parent-chain regression test.
+
 ---
 
 ## Phase 6 — Content-Addressed Storage Layer (IPFS hot / Arweave cold)

@@ -8,11 +8,17 @@ pub mod anchor_program_source;
 pub mod create_branch;
 pub mod create_commit;
 pub mod create_tag;
+pub mod delete_branch;
 pub mod initialize_repository;
 pub mod merge;
+pub mod reset_branch;
 pub mod update_branch;
 pub mod update_permissions;
 
 pub use create_branch::CreateBranch;
 pub use create_commit::CreateCommit;
+pub use delete_branch::DeleteBranch;
 pub use initialize_repository::InitializeRepository;
+pub use merge::Merge;
+pub use reset_branch::ResetBranch;
+pub use update_branch::UpdateBranch;

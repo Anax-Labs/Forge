@@ -36,6 +36,7 @@ pub mod events;
 pub mod instructions;
 pub mod name;
 pub mod pda;
+pub mod refs;
 pub mod state;
 
 mod init;
@@ -49,8 +50,15 @@ use anchor_lang::prelude::*;
 // them.
 pub(crate) use instructions::create_branch::__client_accounts_create_branch;
 pub(crate) use instructions::create_commit::__client_accounts_create_commit;
+pub(crate) use instructions::delete_branch::__client_accounts_delete_branch;
 pub(crate) use instructions::initialize_repository::__client_accounts_initialize_repository;
-pub use instructions::{CreateBranch, CreateCommit, InitializeRepository};
+pub(crate) use instructions::merge::__client_accounts_merge;
+pub(crate) use instructions::reset_branch::__client_accounts_reset_branch;
+pub(crate) use instructions::update_branch::__client_accounts_update_branch;
+pub use instructions::{
+    CreateBranch, CreateCommit, DeleteBranch, InitializeRepository, Merge, ResetBranch,
+    UpdateBranch,
+};
 
 declare_id!("4smCAEoycSXSvVsyic8ircQmHmENPCHn17Fma83SYVbf");
 
@@ -130,5 +138,53 @@ pub mod forge_repository {
             message_hash,
             attestation_hash,
         )
+    }
+
+    /// Fast-forwards or merges a branch head (§9.2, §7.2, §7.4).
+    ///
+    /// The transaction must prepend an Ed25519 verify over the branch-update
+    /// message (`forge_object::branch::branch_update_message`).
+    ///
+    /// # Errors
+    /// See [`instructions::update_branch::handler`] for validation failures.
+    pub fn update_branch(
+        ctx: Context<UpdateBranch>,
+        new_head: [u8; 32],
+        expected_head_seq: u64,
+    ) -> Result<()> {
+        instructions::update_branch::handler(ctx, new_head, expected_head_seq)
+    }
+
+    /// Explicitly resets a branch to a non-descendant commit, emitting
+    /// `BranchReset` (§7.3). The repository history root is not affected.
+    ///
+    /// # Errors
+    /// See [`instructions::reset_branch::handler`] for validation failures.
+    pub fn reset_branch(
+        ctx: Context<ResetBranch>,
+        new_head: [u8; 32],
+        expected_head_seq: u64,
+    ) -> Result<()> {
+        instructions::reset_branch::handler(ctx, new_head, expected_head_seq)
+    }
+
+    /// Deletes a non-default branch and refunds its rent (§7.2).
+    ///
+    /// # Errors
+    /// See [`instructions::delete_branch::handler`] for validation failures.
+    pub fn delete_branch(ctx: Context<DeleteBranch>) -> Result<()> {
+        instructions::delete_branch::handler(ctx)
+    }
+
+    /// Advances a target branch to a two-parent merge commit (§6.6).
+    ///
+    /// # Errors
+    /// See [`instructions::merge::handler`] for validation failures.
+    pub fn merge(
+        ctx: Context<Merge>,
+        merge_commit_oid: [u8; 32],
+        expected_target_seq: u64,
+    ) -> Result<()> {
+        instructions::merge::handler(ctx, merge_commit_oid, expected_target_seq)
     }
 }

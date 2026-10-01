@@ -792,6 +792,83 @@ fn create_commit_compute_units_within_default_limit() {
     );
 }
 
+/// Regression: a commit whose parent already exists must be accepted, which
+/// exercises `validate_parent_account` deserializing an existing `CommitAccount`.
+#[test]
+fn create_commit_accepts_parent_chain() {
+    let Some((mut svm, pid, owner)) = setup() else {
+        return;
+    };
+    let repo = init_repo(&mut svm, &pid, &owner);
+    let tree_oid = [4u8; 32];
+    let message_hash = [5u8; 32];
+
+    let c1 = [3u8; 32];
+    let (ah1, _) = sample_attestation(&repo, &owner.pubkey(), c1, tree_oid, message_hash);
+    let sig1 = owner
+        .sign_message(&ah1)
+        .as_ref()
+        .try_into()
+        .expect("signature");
+    let ed1 = ed25519_verify_instruction(&ah1, &sig1, &owner.pubkey().to_bytes());
+    let forge1 = create_commit_instruction(
+        &pid,
+        &owner.pubkey(),
+        repo,
+        c1,
+        0,
+        [0u8; 32],
+        [0u8; 32],
+        tree_oid,
+        1_700_000_000,
+        message_hash,
+        ah1,
+        system_program(),
+        system_program(),
+    );
+    send(&mut svm, &owner, &[ed1, forge1]).expect("root commit");
+
+    let c2 = [6u8; 32];
+    let (ah2, _) = sample_attestation(&repo, &owner.pubkey(), c2, tree_oid, message_hash);
+    let sig2 = owner
+        .sign_message(&ah2)
+        .as_ref()
+        .try_into()
+        .expect("signature");
+    let ed2 = ed25519_verify_instruction(&ah2, &sig2, &owner.pubkey().to_bytes());
+    let c1_addr = commit_address(&pid, &repo, &c1);
+    let forge2 = create_commit_instruction(
+        &pid,
+        &owner.pubkey(),
+        repo,
+        c2,
+        1,
+        c1,
+        [0u8; 32],
+        tree_oid,
+        1_700_000_001,
+        message_hash,
+        ah2,
+        c1_addr,
+        system_program(),
+    );
+    send(&mut svm, &owner, &[ed2, forge2]).expect("child commit");
+
+    let repo_state = RepositoryAccount::try_deserialize(
+        &mut svm.get_account(&repo).expect("repo").data.as_slice(),
+    )
+    .expect("repo");
+    assert_eq!(repo_state.commit_count, 2);
+
+    let c2_addr = commit_address(&pid, &repo, &c2);
+    let c2_state =
+        CommitAccount::try_deserialize(&mut svm.get_account(&c2_addr).expect("c2").data.as_slice())
+            .expect("c2");
+    assert_eq!(c2_state.parent_count, 1);
+    assert_eq!(c2_state.parent_a, c1);
+    assert_eq!(c2_state.seq, 1);
+}
+
 #[allow(dead_code)]
 fn _message_import() {
     let _ = std::mem::size_of::<Message>();

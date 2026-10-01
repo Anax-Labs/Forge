@@ -61,3 +61,59 @@ pub struct CommitCreated {
     /// Slot the commit was anchored in.
     pub slot: u64,
 }
+
+/// Emitted when a branch head is fast-forwarded or merged (§7.2).
+#[event]
+pub struct BranchUpdated {
+    /// Repository PDA.
+    pub repository: Pubkey,
+    /// Branch name (NUL-padded `[u8; 32]`).
+    pub name: [u8; 32],
+    /// Previous head commit (all-zero for a previously empty branch).
+    pub old_head: [u8; 32],
+    /// New head commit.
+    pub new_head: [u8; 32],
+    /// New (monotonic) `head_seq`.
+    pub head_seq: u64,
+    /// Authority that authorized the update.
+    pub actor: Pubkey,
+    /// Slot of the update.
+    pub slot: u64,
+}
+
+/// Emitted when a branch head is explicitly reset to a non-descendant (§7.3).
+///
+/// History is never erased: the append-only repository `history_root` is
+/// unaffected by this event (§11 #4/#9).
+#[event]
+pub struct BranchReset {
+    /// Repository PDA.
+    pub repository: Pubkey,
+    /// Branch name (NUL-padded `[u8; 32]`).
+    pub name: [u8; 32],
+    /// Previous head commit.
+    pub old_head: [u8; 32],
+    /// New head commit (not necessarily a descendant of `old_head`).
+    pub new_head: [u8; 32],
+    /// New (monotonic) `head_seq`.
+    pub head_seq: u64,
+    /// Authority that authorized the reset.
+    pub actor: Pubkey,
+    /// Slot of the reset.
+    pub slot: u64,
+}
+
+/// Emitted when a non-default branch is deleted (§7.2).
+#[event]
+pub struct BranchDeleted {
+    /// Repository PDA.
+    pub repository: Pubkey,
+    /// Branch name (NUL-padded `[u8; 32]`).
+    pub name: [u8; 32],
+    /// The head commit the branch pointed at when deleted.
+    pub old_head: [u8; 32],
+    /// Authority that deleted the branch.
+    pub actor: Pubkey,
+    /// Slot of the deletion.
+    pub slot: u64,
+}

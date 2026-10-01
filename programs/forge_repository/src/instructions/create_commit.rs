@@ -220,7 +220,8 @@ fn validate_parent_account(
         data.len() >= 8 + CommitAccount::LEN,
         ForgeError::UnknownCommit
     );
-    let commit = CommitAccount::try_deserialize(&mut &data[8..])?;
+    // `try_deserialize` expects the discriminator-prefixed buffer.
+    let commit = CommitAccount::try_deserialize(&mut &data[..])?;
     require_keys_eq!(commit.repo, *repo, ForgeError::UnknownCommit);
     require!(
         commit.commit_oid == *expected_oid,

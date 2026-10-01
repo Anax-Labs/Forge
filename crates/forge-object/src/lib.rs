@@ -43,6 +43,7 @@
 
 pub mod attestation;
 pub mod blob;
+pub mod branch;
 mod cbor;
 pub mod commit;
 pub mod error;
