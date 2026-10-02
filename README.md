@@ -75,10 +75,12 @@ is **git-ignored** (never commit keypairs).
 
 - [`phase_implementation.md`](phase_implementation.md) — 10-phase execution roadmap,
   dependency graph, requirement coverage matrix, risks, open questions.
+- [`docs/architecture.md`](docs/architecture.md) — system architecture, onchain
+  program map, push data flow, and Mermaid diagrams.
 - [`docs/protocol.md`](docs/protocol.md) — canonical byte formats (frozen in Phase 2).
 - [`docs/threat-model.md`](docs/threat-model.md) — security model checklist.
 - [`docs/adr/`](docs/adr/) — architecture decision records (events, names/seeds,
-  state layout & authorization).
+  state layout/authorization, commit/Ed25519, branch refs).
 
 ## MVP scope (spec §19.1)
 
