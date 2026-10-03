@@ -20,7 +20,7 @@ custom merge engine, general rule VM, onchain file storage.
 - Forged commits → onchain Ed25519 verification in `create_commit` (Phase 4, `programs/forge_repository/src/ed25519.rs`).
 - Unauthorized branch update / replay → authority + `head_seq` CAS (Phases 4–5).
 - History rewrite → append-only `history_root` + logged reset (Phases 4–5).
-- Storage disappearance → multi-pin + Arweave + `gc --verify-availability` (Phase 6).
+- Storage disappearance → multi-pin + Arweave + `gc --verify-availability` (Phase 6, implemented).
 - Path traversal / symlink payloads → safe tree construction (Phase 2).
 - Malicious metadata → length/charset limits, no log parsing (Phases 3, 9).
 
@@ -84,3 +84,20 @@ custom merge engine, general rule VM, onchain file storage.
 - **Accidental ref deletion:** deleting the default branch is forbidden
   (`CannotDeleteDefaultBranch`); deleting another branch closes its account and
   emits `BranchDeleted`.
+
+## Phase 6 status (implemented)
+
+- **Untrusted locators:** CIDs, Arweave TXIDs, and `.forge/cas` paths are
+  hints only (`crates/forge-storage`, ADR 0006). `fetch_object` /
+  `GitObject::verify_framed` recompute the Git OID via `forge-object` and
+  reject `OidMismatch`. CAR block CIDs are re-hashed independently.
+- **Storage disappearance:** `MultiPin` requires ≥2 backends on upload; tests
+  kill one pin and still fetch. `forge gc --verify-availability` reports
+  `available` / `degraded` / `missing` / `corrupt` from `.forge/storage-index`.
+- **Corrupt bytes:** flipped CAR/object bytes fail CID or OID verification
+  (`tests/storage_consistency.rs`). A matching locator string is never enough.
+- **Arweave size limit:** payloads over 9_500_000 bytes are chunked through an
+  Irys-compatible bundler; the manifest SHA-256 is checked on read (mock HTTP
+  in tests; no live fees).
+- **Path traversal in local CAS:** `FsBackend` rejects locator ids containing
+  `/`, `\\`, or `..`.

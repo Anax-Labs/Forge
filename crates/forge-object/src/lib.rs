@@ -54,8 +54,8 @@ pub mod path;
 pub mod tree;
 
 pub use attestation::Attestation;
-pub use commit::{Commit, Identity};
+pub use commit::{commit_tree_and_parents, Commit, Identity};
 pub use error::ObjectError;
 pub use hash::{HashAlgorithm, Oid};
-pub use object::{oid, serialize, ObjectType};
+pub use object::{oid, parse_framed, serialize, ObjectType};
 pub use tree::{EntryMode, TreeBuilder, TreeEntry};

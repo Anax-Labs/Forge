@@ -160,6 +160,144 @@ impl Commit {
     pub fn oid(&self) -> Oid {
         object::oid(ObjectType::Commit, &self.payload(), self.algorithm)
     }
+
+    /// Parses a Forge-canonical commit payload produced by [`Self::payload`].
+    ///
+    /// # Errors
+    /// Returns [`ObjectError::InvalidCommit`] or [`ObjectError::InvalidIdentity`]
+    /// when the payload is not in the canonical form.
+    pub fn from_payload(algorithm: HashAlgorithm, payload: &[u8]) -> Result<Self, ObjectError> {
+        let text = std::str::from_utf8(payload)
+            .map_err(|_| ObjectError::InvalidCommit("payload is not valid UTF-8".into()))?;
+        let (headers, message) = text.split_once("\n\n").ok_or_else(|| {
+            ObjectError::InvalidCommit("missing blank line before message".into())
+        })?;
+
+        let mut tree = None;
+        let mut parents = Vec::new();
+        let mut author = None;
+        let mut committer = None;
+        for line in headers.split('\n') {
+            if let Some(hex) = line.strip_prefix("tree ") {
+                if tree.is_some() {
+                    return Err(ObjectError::InvalidCommit("duplicate tree".into()));
+                }
+                tree = Some(Oid::from_hex(algorithm, hex)?);
+            } else if let Some(hex) = line.strip_prefix("parent ") {
+                parents.push(Oid::from_hex(algorithm, hex)?);
+            } else if let Some(rest) = line.strip_prefix("author ") {
+                if author.is_some() {
+                    return Err(ObjectError::InvalidCommit("duplicate author".into()));
+                }
+                author = Some(parse_identity_line(rest)?);
+            } else if let Some(rest) = line.strip_prefix("committer ") {
+                if committer.is_some() {
+                    return Err(ObjectError::InvalidCommit("duplicate committer".into()));
+                }
+                committer = Some(parse_identity_line(rest)?);
+            } else {
+                return Err(ObjectError::InvalidCommit(format!(
+                    "unsupported header: {line}"
+                )));
+            }
+        }
+
+        let tree = tree.ok_or_else(|| ObjectError::InvalidCommit("missing tree".into()))?;
+        let author = author.ok_or_else(|| ObjectError::InvalidCommit("missing author".into()))?;
+        let committer =
+            committer.ok_or_else(|| ObjectError::InvalidCommit("missing committer".into()))?;
+        Self::new(
+            algorithm,
+            tree,
+            parents,
+            author,
+            committer,
+            message.as_bytes().to_vec(),
+        )
+    }
+}
+
+/// Reads the tree and parent oids from a commit payload without requiring the
+/// rest of the headers to be Forge-canonical. Used when walking a stored DAG
+/// (§8.3). Extra headers (encoding, gpgsig, …) are ignored.
+///
+/// # Errors
+/// Returns [`ObjectError::InvalidCommit`] when `tree` is missing or an oid
+/// cannot be parsed.
+pub fn commit_tree_and_parents(
+    payload: &[u8],
+    algorithm: HashAlgorithm,
+) -> Result<(Oid, Vec<Oid>), ObjectError> {
+    let text = std::str::from_utf8(payload)
+        .map_err(|_| ObjectError::InvalidCommit("payload is not valid UTF-8".into()))?;
+    let headers = text.split("\n\n").next().unwrap_or(text);
+    let mut tree = None;
+    let mut parents = Vec::new();
+    for line in headers.split('\n') {
+        if let Some(hex) = line.strip_prefix("tree ") {
+            tree = Some(Oid::from_hex(algorithm, hex)?);
+        } else if let Some(hex) = line.strip_prefix("parent ") {
+            parents.push(Oid::from_hex(algorithm, hex)?);
+        }
+    }
+    let tree = tree.ok_or_else(|| ObjectError::InvalidCommit("missing tree".into()))?;
+    Ok((tree, parents))
+}
+
+fn parse_identity_line(line: &str) -> Result<Identity, ObjectError> {
+    let Some((rest, tz)) = line.rsplit_once(' ') else {
+        return Err(ObjectError::InvalidIdentity(
+            "identity missing timezone".into(),
+        ));
+    };
+    let Some((rest, ts)) = rest.rsplit_once(' ') else {
+        return Err(ObjectError::InvalidIdentity(
+            "identity missing timestamp".into(),
+        ));
+    };
+    let timestamp = ts
+        .parse::<i64>()
+        .map_err(|_| ObjectError::InvalidIdentity("timestamp is not an integer".into()))?;
+    let tz_offset_minutes = parse_tz_offset(tz)?;
+    let Some(lt) = rest.rfind('<') else {
+        return Err(ObjectError::InvalidIdentity(
+            "identity missing email".into(),
+        ));
+    };
+    if !rest.ends_with('>') {
+        return Err(ObjectError::InvalidIdentity(
+            "identity email is not angle-bracketed".into(),
+        ));
+    }
+    let name = rest[..lt].trim_end();
+    let email = &rest[lt + 1..rest.len() - 1];
+    Identity::new(name, email, timestamp, tz_offset_minutes)
+}
+
+fn parse_tz_offset(tz: &str) -> Result<i32, ObjectError> {
+    let bytes = tz.as_bytes();
+    if bytes.len() != 5 || (bytes[0] != b'+' && bytes[0] != b'-') {
+        return Err(ObjectError::InvalidIdentity(format!(
+            "invalid timezone offset: {tz}"
+        )));
+    }
+    let hours: i32 = tz[1..3]
+        .parse()
+        .map_err(|_| ObjectError::InvalidIdentity("invalid timezone hours".into()))?;
+    let minutes: i32 = tz[3..5]
+        .parse()
+        .map_err(|_| ObjectError::InvalidIdentity("invalid timezone minutes".into()))?;
+    if minutes >= 60 {
+        return Err(ObjectError::InvalidIdentity(
+            "timezone minutes out of range".into(),
+        ));
+    }
+    let value = hours * 60 + minutes;
+    if bytes[0] == b'-' {
+        Ok(-value)
+    } else {
+        Ok(value)
+    }
 }
 
 #[cfg(test)]
@@ -190,6 +328,12 @@ mod tests {
         assert!(payload.contains("\nauthor Alice <alice@example.com> 1700000000 +0000\n"));
         assert!(payload.ends_with("\n\nInitial commit\n"));
         assert!(!payload.contains("parent "));
+        let parsed = Commit::from_payload(HashAlgorithm::Sha256, &commit.payload()).unwrap();
+        assert_eq!(parsed, commit);
+        let (tree, parents) =
+            commit_tree_and_parents(&commit.payload(), HashAlgorithm::Sha256).unwrap();
+        assert_eq!(tree, commit.tree);
+        assert!(parents.is_empty());
     }
 
     #[test]

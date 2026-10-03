@@ -50,6 +50,14 @@ pub enum ObjectError {
     #[error("invalid identity: {0}")]
     InvalidIdentity(String),
 
+    /// A Git object framing header was malformed.
+    #[error("invalid object framing: {0}")]
+    InvalidFraming(String),
+
+    /// A commit payload was malformed.
+    #[error("invalid commit: {0}")]
+    InvalidCommit(String),
+
     /// Canonical CBOR decoding failed.
     #[error("cbor decode error: {0}")]
     Cbor(String),

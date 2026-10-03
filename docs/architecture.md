@@ -1,11 +1,11 @@
 # Forge — Architecture
 
-> Status: **Phases 1–5 implemented.** This document reflects the code as built;
+> Status: **Phases 1–6 implemented.** This document reflects the code as built;
 > items marked `[ ]` are scheduled in later phases (see `../phase_implementation.md`).
 > Canonical byte formats are in [`protocol.md`](protocol.md); frozen design
 > decisions are in [`adr/`](adr/).
 
-Legend: `[✓]` implemented (Phases 1–5) · `[ ]` planned (Phases 6–10) · `*` layout only.
+Legend: `[✓]` implemented (Phases 1–6) · `[ ]` planned (Phases 7–10) · `*` layout only.
 
 ---
 
@@ -43,7 +43,7 @@ Legend: `[✓]` implemented (Phases 1–5) · `[ ]` planned (Phases 6–10) · `
 │   CONTENT-ADDRESSED STORAGE       │   CID / storage hint        │
 │   IPFS  (hot, ≥2 pins)            │──────────────┐              │
 │   Arweave (tags / checkpoints)    │              │              │
-│   [ ] Phase 6                     │              │              │
+│   [✓] Phase 6  forge-storage      │              │              │
 └───────────────────────────────────┘              │              │
                                                    ▼              ▼
                                      ┌──────────────────────────────────────────────┐
@@ -137,7 +137,7 @@ delete_branch()
                           │
                           ▼
         ┌─────────────────────────────────────────────────────────────┐
-        │ 1. upload missing objects to IPFS (≥2 pins)  [Phase 6]      │
+        │ 1. upload missing objects to IPFS (≥2 pins)  [✓ Phase 6]     │
         │    build CAR/git-bundle; record CIDs in .forge/storage-index│
         └───────────────────────────────┬─────────────────────────────┘
                                         ▼
@@ -190,7 +190,7 @@ flowchart TB
   cli --> local["Local repo: .git objects + .forge metadata"]
   cli --> wallet["Wallet (Ed25519 signer)"]
   local --> engine["forge-object: canonical OIDs, attestation, history_root"]
-  engine -->|CAR / git bundle| storage["IPFS hot + Arweave cold"]
+  engine -->|CAR / git bundle| storage["forge-storage: IPFS hot + Arweave cold"]
   wallet -->|signature| program
   storage -.->|CID / hint| program
   cli -->|"create_commit / update_branch / merge"| program["Solana program: forge_repository"]

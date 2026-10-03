@@ -70,6 +70,42 @@ pub fn oid(object_type: ObjectType, payload: &[u8], algorithm: HashAlgorithm) ->
     Oid::new(algorithm, algorithm.digest(&framed)).expect("digest length matches algorithm")
 }
 
+/// Parses Git-framed bytes (`<type> <len>\0<payload>`) into type and payload.
+///
+/// The declared length must match the remaining bytes exactly. Callers that
+/// received these bytes from storage must still recompute [`oid`] and compare
+/// against the expected identifier (§8.3).
+///
+/// # Errors
+/// Returns [`ObjectError::InvalidFraming`] or [`ObjectError::InvalidObjectType`].
+pub fn parse_framed(bytes: &[u8]) -> Result<(ObjectType, &[u8]), ObjectError> {
+    let space = bytes
+        .iter()
+        .position(|b| *b == b' ')
+        .ok_or_else(|| ObjectError::InvalidFraming("missing space after type".into()))?;
+    let type_str = std::str::from_utf8(&bytes[..space])
+        .map_err(|_| ObjectError::InvalidFraming("type is not valid UTF-8".into()))?;
+    let object_type = ObjectType::parse(type_str)?;
+    let rest = &bytes[space + 1..];
+    let nul = rest
+        .iter()
+        .position(|b| *b == 0)
+        .ok_or_else(|| ObjectError::InvalidFraming("missing NUL after length".into()))?;
+    let len_str = std::str::from_utf8(&rest[..nul])
+        .map_err(|_| ObjectError::InvalidFraming("length is not valid UTF-8".into()))?;
+    let declared = len_str
+        .parse::<usize>()
+        .map_err(|_| ObjectError::InvalidFraming(format!("invalid length: {len_str}")))?;
+    let payload = &rest[nul + 1..];
+    if payload.len() != declared {
+        return Err(ObjectError::InvalidFraming(format!(
+            "length mismatch: declared {declared}, actual {}",
+            payload.len()
+        )));
+    }
+    Ok((object_type, payload))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -97,5 +133,19 @@ mod tests {
     fn empty_blob_sha1_is_well_known() {
         let oid = oid(ObjectType::Blob, b"", HashAlgorithm::Sha1);
         assert_eq!(oid.to_hex(), "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391");
+    }
+
+    #[test]
+    fn parse_framed_roundtrip() {
+        let framed = serialize(ObjectType::Blob, b"hello");
+        let (ty, payload) = parse_framed(&framed).unwrap();
+        assert_eq!(ty, ObjectType::Blob);
+        assert_eq!(payload, b"hello");
+    }
+
+    #[test]
+    fn parse_framed_rejects_length_mismatch() {
+        assert!(parse_framed(b"blob 4\0hi").is_err());
+        assert!(parse_framed(b"blob").is_err());
     }
 }

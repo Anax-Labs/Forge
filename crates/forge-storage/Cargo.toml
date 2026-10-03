@@ -1,0 +1,18 @@
+[package]
+name = "forge-storage"
+version = "0.1.0"
+description = "Content-addressed storage layer for Forge (IPFS hot / Arweave cold)"
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+forge-object = { path = "../forge-object" }
+hex = "0.4"
+reqwest = { workspace = true, features = ["blocking", "json", "multipart"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = "0.10"
+thiserror = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"

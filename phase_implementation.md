@@ -417,6 +417,22 @@ Every fetched byte is re-hashed before use; no code path trusts a storage hint; 
 - Arweave cost/limits depend on live fees (§2.2); mock in tests, document assumptions.
 - IPFS gateway reliability is a known risk (§2.2); the interface must allow alternate providers.
 
+### Status (implemented)
+
+- **Crate:** `crates/forge-storage` — CARv1 of Git-framed objects, `StorageBackend`
+  trait, `MemoryBackend` / `FsBackend` / Kubo `IpfsClient` / Irys
+  `ArweaveBundler`, `MultiPin` (≥2), `.forge/storage-index`,
+  `upload_bundle` / `fetch_object` (OID re-hash), `gc --verify-availability`.
+- **Providers (Open Question #4):** Kubo HTTP RPC for hot pins; Irys-compatible
+  bundler for Arweave; local `.forge/cas` for tests. See ADR 0006.
+- **CLI:** `forge gc --verify-availability` loads `.forge/storage-index` and
+  the local CAS; exit non-zero if any object is degraded/missing/corrupt.
+- **Tests:** `cargo test -p forge-storage` plus `cli/tests/gc_verify.rs`
+  (OID/CID round-trip, corruption, killed-pin, empty blob, 64 KiB bundle,
+  mock Arweave chunking, unbacked-object fixture).
+- **forge-object:** `parse_framed` and `Commit::from_payload` /
+  `commit_tree_and_parents` added so the walker never re-implements codecs.
+
 ---
 
 ## Phase 7 — Local-First `forge` CLI (Git-backed, Offline)
@@ -792,7 +808,7 @@ These cannot be determined from the specification and must not be silently assum
 1. **`gix` vs. `git2` (vs. hand-rolled Git writer):** §21 says `gix`/`git2` but does not resolve SHA-256 support, which Phase 2 depends on. Which library, and what is the fallback if SHA-256 writing is unsupported?
 2. **Attestation encoding:** §5.5 offers "canonical CBOR or canonical JSON (JCS)." Which one? It affects golden vectors and all consumers.
 3. **`history_root` endianness and attestation map ordering:** §5.6/§5.5 do not specify byte order or field ordering. Must be frozen in Phase 2.
-4. **Storage providers:** §8.3 names IPFS and Arweave but not specific pinning services or bundler (Irys vs ArDrive). Which providers, and what are the credentials/config?
+4. **Storage providers:** §8.3 names IPFS and Arweave but not specific pinning services or bundler (Irys vs ArDrive). Which providers, and what are the credentials/config? **Resolved in Phase 6 / ADR 0006:** Kubo HTTP RPC (≥2 API origins) + Irys-compatible bundler; local `.forge/cas` for tests.
 5. **Wallet/keypair management:** §15 lists Phantom/Backpack/Solflare or CLI keypair; the CLI needs a concrete convention (file path, env var, hardware). Which?
 6. **RPC provider:** §21 says Helius (devnet) with public fallback. Which endpoints/keys, and is an indexer funded?
 7. **`PermissionAccount` in MVP:** §4.6 says MVP "may encode a small allowlist inline and skip this account." Inline allowlist or separate accounts? This affects Phase 3 layout.

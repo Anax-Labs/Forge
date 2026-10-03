@@ -1,9 +1,11 @@
 # Forge Protocol — Canonical Encodings
 
-> **Status:** frozen in Phase 2. The authoritative implementation is
-> [`crates/forge-object`](../crates/forge-object), and the checked-in golden
-> vectors are [`tests/vectors/golden.json`](../tests/vectors/golden.json).
-> Changing anything on this page is a deliberate protocol change and requires
+> **Status:** object encodings frozen in Phase 2; storage pack/index format
+> added in Phase 6 (does not change OIDs). The authoritative implementations
+> are [`crates/forge-object`](../crates/forge-object) and
+> [`crates/forge-storage`](../crates/forge-storage). Golden vectors:
+> [`tests/vectors/golden.json`](../tests/vectors/golden.json).
+> Changing object encodings is a deliberate protocol change and requires
 > regenerating the vectors and updating the onchain/CLI consumers.
 >
 > Source of truth: [`ONCHAIN_VERSION_CONTROL_ARCHITECTURE.md`](../ONCHAIN_VERSION_CONTROL_ARCHITECTURE.md)
@@ -174,3 +176,42 @@ Run all engine checks:
 ```bash
 cargo test -p forge-object
 ```
+
+## 8. Content-addressed storage (Phase 6, §8.3)
+
+Canonical object bytes remain those of §1–§4. This section freezes **how those
+bytes are packed and located**, not a second hash function.
+
+**CARv1.** A Forge object bundle is an IPLD CARv1 whose blocks are Git-framed
+objects. Each block CID is CIDv1 / `raw` (0x55) / `sha2-256` of the framed
+bytes. On decode, every block CID is recomputed; on object use, every Git OID
+is recomputed via `forge-object`. A CID is never the protocol address.
+
+**`.forge/storage-index` (JSON v1):**
+
+```
+{
+  "version": 1,
+  "algorithm": "sha256",
+  "objects": {
+    "sha256:<hex>": {
+      "object_type": "blob",
+      "locators": [
+        {"backend": "ipfs", "provider": "ipfs-0", "id": "bafkrei…"},
+        {"backend": "fs", "provider": "cas", "id": "bafkrei…"}
+      ]
+    }
+  }
+}
+```
+
+Locators are hints (`ipfs` CID, `arweave` TXID, `fs` / `memory` ids). See
+ADR 0006.
+
+**Availability policy.** A push uploads to ≥2 independent pins. `forge gc
+--verify-availability` classifies each indexed oid as available (≥2 verified
+copies), degraded (1), missing (0), or corrupt (hash mismatch).
+
+**Arweave.** Tag/checkpoint payloads go through an Irys-compatible bundler.
+Payloads above 9_500_000 bytes are split and joined via a `{v,chunks,sha256}`
+manifest; the payload digest is checked on read.
