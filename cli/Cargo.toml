@@ -5,21 +5,36 @@ description = "Forge CLI — Git-backed onchain version control client"
 edition.workspace = true
 rust-version.workspace = true
 
+[lib]
+name = "forge"
+path = "src/lib.rs"
+
 [[bin]]
 name = "forge"
 path = "src/main.rs"
 
 [dependencies]
 anyhow = { workspace = true }
+bs58 = "0.5"
 clap = { workspace = true }
 forge-object = { path = "../crates/forge-object" }
 forge-storage = { path = "../crates/forge-storage" }
-gix = { workspace = true }
+gix = { workspace = true, features = ["sha256"] }
+hex = "0.4"
 reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-solana-sdk = { workspace = true }
+solana-keypair = "3"
+solana-pubkey = "3.0"
+solana-signature = "3"
+solana-signer = "3"
+solana-message = "3.0.1"
+solana-transaction = "3.0.2"
+solana-account = "3"
+solana-rpc-client = "3"
+litesvm = { version = "0.10.0", features = ["precompiles"] }
 thiserror = { workspace = true }
 
 [dev-dependencies]
 tempfile = "3"
+forge-object = { path = "../crates/forge-object" }

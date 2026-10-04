@@ -101,3 +101,29 @@ custom merge engine, general rule VM, onchain file storage.
   in tests; no live fees).
 - **Path traversal in local CAS:** `FsBackend` rejects locator ids containing
   `/`, `\\`, or `..`.
+
+## Phase 7 status (implemented)
+
+- **Forged / unsigned local commits:** `forge commit` writes a canonical
+  attestation sidecar plus a detached Ed25519 signature (ADR 0007).
+  `forge verify` recomputes Git OIDs via `forge-object`, re-hashes the CBOR
+  file, and checks the signature. Tampered CBOR fails (exit 1). Missing
+  sidecar/HEAD is exit 3. History inclusion is Phase 8.
+- **Path traversal / symlink payloads:** `forge add` and commit-time index
+  walks reject `..`, absolute paths, and unsafe tree names (`path::sanitize_name`).
+- **Wallet identity:** authorship is the Solana JSON keypair
+  (`FORGE_WALLET` or `.forge/id.json`, gitignored). Git `author`/`committer`
+  strings are display-only (`Forge <pubkey@forge>`).
+- **No network:** Phase 7 commands do not contact Solana or storage providers.
+
+## Phase 8 status (implemented)
+
+- **Forged author:** `create_commit` still requires the repository owner
+  (MVP). Wallet B cannot push to wallet A's repo (`Unauthorized` / failed tx).
+- **Stale push:** `update_branch` CAS on `head_seq`; a replayed expected seq
+  fails (`StaleBranchHead` 6015). The CLI tells the user to `forge pull`.
+- **Untrusted CAS:** clone fetches a CAR and re-hashes every Git OID.
+  Flipped pin bytes fail CID/OID checks (clone abort). `forge verify` walks
+  onchain commits and recomputes `history_root` with `forge-object`.
+- **No indexer:** PDAs are derived client-side; account bytes are parsed
+  against frozen layouts (ADR 0008).

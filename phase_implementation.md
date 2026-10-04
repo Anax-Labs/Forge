@@ -490,9 +490,24 @@ Phase 2 (canonical engine), Phase 1 (crate). Storage (Phase 6) is not required f
 A developer can do a normal local Git workflow through `forge`, authorship is cryptographically attested, and local verification passes; no chain dependency for these commands.
 
 ### Risks / Questions
-- `gix` API coverage for SHA-256 and custom hashing may force a hybrid approach (Open Questions).
-- Sidecar attestation filename/format (`.cbor`) must match what Phase 8/9 and the SDK expect.
-- Wallet keypair source (file path vs. CLI keypair vs. hardware) unspecified — needs a convention.
+- `gix` SHA-256 writing is incomplete → hybrid `git` CLI writer + `gix::open` (ADR 0007).
+- Sidecar `.cbor` is canonical attestation only; signature is `.sig` (ADR 0007).
+- Wallet: Solana JSON keypair (`.forge/id.json` / `FORGE_WALLET`); hardware deferred.
+
+### Status (implemented)
+
+- **CLI:** `forge init/add/commit/status/log/branch/checkout/remote/verify`
+  plus Phase 6 `gc --verify-availability`. No network calls.
+- **Git:** SHA-256 work trees via `git init --object-format=sha256`; objects
+  hashed with `forge-object` and written with `git hash-object` so
+  `git rev-parse HEAD` equals the Forge commit oid (ADR 0007).
+- **Wallet:** Solana JSON keypair at `.forge/id.json`, overridable with
+  `FORGE_WALLET` (open question #5).
+- **Sidecars:** `.forge/attestations/<oid>.cbor` (canonical attestation) +
+  `<oid>.sig` (Ed25519). Local verify is `LOCAL_VERIFIED`; history inclusion
+  is Phase 8. Exit codes 0/1/3 per §12.4.
+- **Tests:** `cli/tests/local_workflow.rs` — init→add→commit→log→verify,
+  `git rev-parse` match, sidecar tamper, path-escape rejection, remotes.
 
 ---
 
@@ -550,10 +565,20 @@ Phase 5 (all program instructions), Phase 6 (storage), Phase 7 (CLI local workfl
 Two wallets can create/verify history onchain end-to-end; every anchored root is independently reproducible by the client; no trusted indexer is required.
 
 ### Risks / Questions
-- Transaction size (1,232 B legacy vs. 4,096 B v1) may limit how many operations fit per tx; one push issues 2 txs (commit, branch) — confirm batching strategy (§2.3, §13).
+- Transaction size: one commit + one branch update per push uses legacy/v0 txs (ADR 0008).
 - Hot `RepositoryAccount` write-lock can serialize concurrent pushes (§9.5) — acceptable for demo.
-- Which RPC/commitment level (devnet Helius vs. public) and retry policy.
-- v1 transaction support/activation may be pending; default to legacy/v0 for MVP.
+- RPC: `FORGE_RPC` (default `http://127.0.0.1:8899`); tests use LiteSVM. Hosted Helius keys remain open.
+- v1 transaction support deferred; MVP is legacy/v0.
+
+### Status (implemented)
+
+- **CLI:** `forge push` / `clone` / `pull`; `verify` reports `VERIFIED` with
+  `history_root` inclusion when a PDA is configured (ADR 0008).
+- **Tx builder:** prepends Ed25519 native ix; `emit_cpi!` accounts included.
+- **Push:** dual-pin CAR upload first; `create_commit` per new oid; one
+  `update_branch` with `expected_head_seq`; stale → `forge pull` guidance.
+- **Tests:** `cli/tests/onchain_workflow.rs` — push→clone→verify,
+  forged author, stale CAS replay, corrupt blob.
 
 ---
 
@@ -790,7 +815,7 @@ Explicit edges:
 | 3 | Ed25519 introspection ergonomics/CU per push (§9.4, §26.3) | high | Phase 4 (helper + CU profiling), Phase 5 (reuse) |
 | 4 | Git ↔ SHA-256 interop and tree-ordering determinism bugs (§5.1, §5.3, §26.4) | high | Phase 2 (golden vectors) |
 | 5 | Hot `RepositoryAccount` write-lock throughput (§9.5, §26.5) | medium-high | Phase 4 (note), Phase 10 (benchmark + sharding doc) |
-| 6 | `gix` SHA-256 support / object-writing gaps | high | Phase 1 (decision), Phase 2 (fallback to hand-rolled hashing) |
+| 6 | `gix` SHA-256 support / object-writing gaps | high | Phase 7 / ADR 0007: `git` CLI writes; `gix::open` after init |
 | 7 | IPFS gateway/pinning reliability and cost (§2.2) | medium | Phase 6 (provider abstraction), Phase 10 |
 | 8 | Arweave bundler limits/cost + endowment risk (§8.2) | medium | Phase 6 (aggregation + mock), Phase 9 (tags) |
 | 9 | Transaction size / v1 activation uncertainty (§2.3) | medium | Phase 8 (batching, default legacy) |
@@ -805,12 +830,12 @@ Explicit edges:
 
 These cannot be determined from the specification and must not be silently assumed:
 
-1. **`gix` vs. `git2` (vs. hand-rolled Git writer):** §21 says `gix`/`git2` but does not resolve SHA-256 support, which Phase 2 depends on. Which library, and what is the fallback if SHA-256 writing is unsupported?
+1. **`gix` vs. `git2` (vs. hand-rolled Git writer):** §21 says `gix`/`git2` but does not resolve SHA-256 support, which Phase 2 depends on. Which library, and what is the fallback if SHA-256 writing is unsupported? **Resolved in Phase 7 / ADR 0007:** `git init --object-format=sha256` + `git hash-object` for writes; `gix` (sha256 feature) for open-after-init.
 2. **Attestation encoding:** §5.5 offers "canonical CBOR or canonical JSON (JCS)." Which one? It affects golden vectors and all consumers.
 3. **`history_root` endianness and attestation map ordering:** §5.6/§5.5 do not specify byte order or field ordering. Must be frozen in Phase 2.
 4. **Storage providers:** §8.3 names IPFS and Arweave but not specific pinning services or bundler (Irys vs ArDrive). Which providers, and what are the credentials/config? **Resolved in Phase 6 / ADR 0006:** Kubo HTTP RPC (≥2 API origins) + Irys-compatible bundler; local `.forge/cas` for tests.
-5. **Wallet/keypair management:** §15 lists Phantom/Backpack/Solflare or CLI keypair; the CLI needs a concrete convention (file path, env var, hardware). Which?
-6. **RPC provider:** §21 says Helius (devnet) with public fallback. Which endpoints/keys, and is an indexer funded?
+5. **Wallet/keypair management:** §15 lists Phantom/Backpack/Solflare or CLI keypair; the CLI needs a concrete convention (file path, env var, hardware). Which? **Resolved in Phase 7 / ADR 0007:** Solana JSON keypair at `.forge/id.json`, override `FORGE_WALLET`; hardware wallets deferred to Phase 8/10.
+6. **RPC provider:** §21 says Helius (devnet) with public fallback. Which endpoints/keys, and is an indexer funded? **Partially resolved in Phase 8 / ADR 0008:** `FORGE_RPC` (default localhost) plus LiteSVM for tests. Hosted Helius API keys remain open for Phase 10.
 7. **`PermissionAccount` in MVP:** §4.6 says MVP "may encode a small allowlist inline and skip this account." Inline allowlist or separate accounts? This affects Phase 3 layout.
 8. **`reset_branch` scope:** it is a design decision (§7.3) but not in the MVP MUST list (§19.1). Is it in hackathon scope or SHOULD?
 9. **`merge` tier:** program merge is in §9.2 but §19.1 MUST omits it and §19.2 lists `forge merge` as SHOULD. Is onchain merge MVP or SHOULD?

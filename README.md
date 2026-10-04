@@ -7,9 +7,9 @@ storage.
 
 Working name: `Forge` (protocol), `forge` (CLI).
 
-> Status: **Phase 6 — content-addressed storage (IPFS hot / Arweave cold).**
-> Phases 1–5 (scaffold, `forge-object`, onchain repo/commit/branch) plus
-> `crates/forge-storage` and `forge gc --verify-availability`. See
+> Status: **Phase 8 — onchain CLI (`push` / `clone` / `pull` / `verify`).**
+> Phases 1–7 plus chain txs (Ed25519-prepended `create_commit` /
+> `update_branch`) against LiteSVM or `FORGE_RPC`. See
 > [`phase_implementation.md`](phase_implementation.md) for the 10-phase roadmap,
 > [`docs/adr/`](docs/adr/) for frozen design decisions, and
 > [`ONCHAIN_VERSION_CONTROL_ARCHITECTURE.md`](ONCHAIN_VERSION_CONTROL_ARCHITECTURE.md)
@@ -21,12 +21,12 @@ Working name: `Forge` (protocol), `forge` (CLI).
 programs/forge_repository/   Anchor program (accounts, instructions, events)
 crates/forge-object/         Canonical Git-object/hashing/attestation engine (Phase 2)
 crates/forge-storage/        IPFS/Arweave CAS, CAR bundles, storage-index (Phase 6)
-cli/                         Rust `forge` CLI (gix-backed, built on Git)
+cli/                         Rust `forge` CLI (Git SHA-256 + `.forge/` metadata)
 sdk/                         TypeScript SDK (@solana/kit + Codama client) (Phase 10)
 web/                         Next.js explorer / verify UI (Phase 10)
 indexer/                     Optional Helius webhook indexer, non-authoritative (Phase 10)
 tests/vectors/               Golden Git OID / attestation vectors (Phase 2)
-tests/e2e/                   End-to-end flows (Phases 7–10)
+tests/e2e/                   End-to-end flows (Phases 7–10; local CLI tests in `cli/tests/`)
 docs/                        protocol.md, threat-model.md
 ```
 
@@ -81,7 +81,8 @@ is **git-ignored** (never commit keypairs).
 - [`docs/protocol.md`](docs/protocol.md) — canonical byte formats (frozen in Phase 2).
 - [`docs/threat-model.md`](docs/threat-model.md) — security model checklist.
 - [`docs/adr/`](docs/adr/) — architecture decision records (events, names/seeds,
-  state layout/authorization, commit/Ed25519, branch refs, storage).
+  state layout/authorization, commit/Ed25519, branch refs, storage, local CLI,
+  onchain CLI).
 
 ## MVP scope (spec §19.1)
 

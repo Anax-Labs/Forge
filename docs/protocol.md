@@ -129,7 +129,14 @@ signature        = Ed25519_sign(wallet_sk, attestation_hash)
 
 The sidecar file `.forge/attestations/<commit_oid>.cbor` contains exactly
 `canonical_cbor(attestation)`, so verification is
-`H("forge-attestation\0" || file_bytes)`.
+`H("forge-attestation\0" || file_bytes)`. The 64-byte Ed25519 signature over
+`attestation_hash` is stored as `.forge/attestations/<commit_oid>.sig` so the
+CBOR file stays a pure attestation (ADR 0007). `forge verify` checks OIDs,
+attestation binding, and the signature. With a repository PDA it also walks
+onchain parent `CommitAccount`s, sorts by `seq`, and recomputes
+`history_root` (`VERIFIED`); without a PDA the result is `LOCAL_VERIFIED`
+(ADR 0008). Commits made before a repository PDA exists use `repo = "local"`
+and are re-signed with the PDA on first `forge push`.
 
 Decoding is strict: unknown/duplicate/missing fields, trailing bytes,
 non-minimal length encodings, and indefinite-length items are all rejected, and

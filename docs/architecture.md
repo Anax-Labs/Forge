@@ -1,11 +1,11 @@
 # Forge — Architecture
 
-> Status: **Phases 1–6 implemented.** This document reflects the code as built;
+> Status: **Phases 1–8 implemented.** This document reflects the code as built;
 > items marked `[ ]` are scheduled in later phases (see `../phase_implementation.md`).
 > Canonical byte formats are in [`protocol.md`](protocol.md); frozen design
 > decisions are in [`adr/`](adr/).
 
-Legend: `[✓]` implemented (Phases 1–6) · `[ ]` planned (Phases 7–10) · `*` layout only.
+Legend: `[✓]` implemented (Phases 1–8) · `[ ]` planned (Phases 9–10) · `*` layout only.
 
 ---
 
@@ -14,9 +14,9 @@ Legend: `[✓]` implemented (Phases 1–6) · `[ ]` planned (Phases 7–10) · `
 ```text
 ┌────────────────────────────────────────────────────────────────────────────────────┐
 │                                      DEVELOPER                                       │
-│   forge CLI (Rust, built on Git via gix)                              [✓ scaffold]   │
-│   [ ] Phase 7 local: init/add/commit/status/log/branch/checkout/remote              │
-│   [ ] Phase 8 chain: push/pull/clone/verify                                         │
+│   forge CLI (Rust; Git CLI + gix SHA-256 open; ADR 0007)              [✓]            │
+│   [✓] Phase 7 local: init/add/commit/status/log/branch/checkout/remote/verify        │
+│   [✓] Phase 8 chain: push/pull/clone/verify (ADR 0008)                               │
 └───────────────┬─────────────────────────────────────────────────┬──────────────────┘
                 │                                                 │
                 ▼                                                 ▼
@@ -25,7 +25,7 @@ Legend: `[✓]` implemented (Phases 1–6) · `[ ]` planned (Phases 7–10) · `
 │  .git/  blobs · trees · commits   │             │  signs attestation_hash +         │
 │  .forge/                          │             │  branch-update/reset messages     │
 │    config                         │             └───────────────┬───────────────────┘
-│    attestations/<oid>.cbor        │                             │ signature
+│    attestations/<oid>.cbor+.sig   │                             │ signature
 │    storage-index                  │                             │
 │    onchain-refs (heads + seq)     │                             │
 └───────────┬───────────────────────┘                             │
@@ -126,7 +126,7 @@ delete_branch()
 
 ---
 
-## 3. Data flow — `forge push` (Phase 8 target)
+## 3. Data flow — `forge push` (Phase 8)
 
 ```text
  forge commit (local)                         forge push
@@ -137,7 +137,7 @@ delete_branch()
                           │
                           ▼
         ┌─────────────────────────────────────────────────────────────┐
-        │ 1. upload missing objects to IPFS (≥2 pins)  [✓ Phase 6]     │
+        │ 1. upload missing objects to IPFS (≥2 pins)  [✓ Phase 6/8]    │
         │    build CAR/git-bundle; record CIDs in .forge/storage-index│
         └───────────────────────────────┬─────────────────────────────┘
                                         ▼
@@ -186,7 +186,7 @@ delete_branch()
 
 ```mermaid
 flowchart TB
-  dev[Developer] --> cli["forge CLI (Rust, Git via gix)"]
+  dev[Developer] --> cli["forge CLI (Rust, Git SHA-256 + wallet sidecar)"]
   cli --> local["Local repo: .git objects + .forge metadata"]
   cli --> wallet["Wallet (Ed25519 signer)"]
   local --> engine["forge-object: canonical OIDs, attestation, history_root"]
