@@ -117,3 +117,71 @@ pub struct BranchDeleted {
     /// Slot of the deletion.
     pub slot: u64,
 }
+
+/// Emitted when an annotated tag is created (§9.2).
+#[event]
+pub struct TagCreated {
+    /// Repository PDA.
+    pub repository: Pubkey,
+    /// Tag name (NUL-padded `[u8; 32]`).
+    pub name: [u8; 32],
+    /// Commit the tag points at.
+    pub target_commit: [u8; 32],
+    /// Wallet that created the tag.
+    pub tagger: Pubkey,
+    /// Hash of the tag message.
+    pub message_hash: [u8; 32],
+    /// 1 when the tagger's signature is anchored.
+    pub signed: u8,
+    /// Slot the tag was created in.
+    pub slot: u64,
+}
+
+/// Emitted when a contributor's role is created or updated (§4.6).
+#[event]
+pub struct PermissionChanged {
+    /// Repository PDA.
+    pub repository: Pubkey,
+    /// Contributor wallet.
+    pub contributor: Pubkey,
+    /// New role tag (0=reader,1=writer,2=maintainer,3=admin).
+    pub role: u8,
+    /// Slot the role expires at (0 = never).
+    pub expires_slot: u64,
+    /// Actor that set the role.
+    pub actor: Pubkey,
+    /// Slot of the change.
+    pub slot: u64,
+}
+
+/// Emitted when repository ownership is transferred (§9.2, §15).
+#[event]
+pub struct RepositoryTransferred {
+    /// Repository PDA.
+    pub repository: Pubkey,
+    /// Previous owner.
+    pub old_owner: Pubkey,
+    /// New owner.
+    pub new_owner: Pubkey,
+    /// Actor that authorized the transfer.
+    pub actor: Pubkey,
+    /// Slot of the transfer.
+    pub slot: u64,
+}
+
+/// Emitted when a program→commit source-provenance claim is anchored (§12.2).
+#[event]
+pub struct ProgramSourceAnchored {
+    /// Deployed program account.
+    pub program_id: Pubkey,
+    /// Repository holding the source.
+    pub repository: Pubkey,
+    /// Commit the artifact was built from.
+    pub commit_oid: [u8; 32],
+    /// Executable hash of the deployed program.
+    pub artifact_hash: [u8; 32],
+    /// Wallet that asserted the link (a claim; `verified = 0`).
+    pub attester: Pubkey,
+    /// Slot of the attestation.
+    pub slot: u64,
+}

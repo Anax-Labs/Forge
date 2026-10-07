@@ -127,3 +127,20 @@ custom merge engine, general rule VM, onchain file storage.
   onchain commits and recomputes `history_root` with `forge-object`.
 - **No indexer:** PDAs are derived client-side; account bytes are parsed
   against frozen layouts (ADR 0008).
+
+## Phase 9 status (program side; CLI in 9b)
+
+- **Tag forgery:** `create_tag` verifies the tagger's Ed25519 signature over a
+  domain-separated tag message; the `TagAccount` is `init`-only, so a name cannot
+  be overwritten (`TagCreated.signed = 1`).
+- **Privilege escalation:** roles are enforced by `refs::require_min_role` —
+  owner always, otherwise an unexpired `PermissionAccount` with sufficient role.
+  Non-owners without a permission account → `Unauthorized`; insufficient role →
+  `InsufficientRole` (`allowlist_writer_can_commit_but_reader_cannot`).
+- **Ownership hijack:** `transfer_repository` requires the current owner's
+  signature. The PDA is stable across transfer (clients use `repo_id`).
+- **Fake provenance:** `anchor_program_source` requires the commit to already be
+  in the repository history and the attested account to be a loader-owned
+  executable program; the record is a claim (`verified = 0`), not a proof.
+- **Unbounded roles:** `update_permissions` rejects `role > admin` (`InvalidRole`)
+  and never uses `init_if_needed`.

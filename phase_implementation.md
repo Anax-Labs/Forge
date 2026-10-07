@@ -642,6 +642,29 @@ All SHOULD-HAVE protocol features work and are tested; provenance claim vs. veri
 - Squads/Realms integration is a demo stretch, not required to prove the hook.
 - Provenance semantics for upgrade authority changes are unspecified.
 
+### Status (program side — 9a implemented; CLI 9b pending)
+
+- **`create_tag`:** tagger-signed (Ed25519 over `forge_object::tag::tag_message`),
+  immutable `init`-only `TagAccount`, writer-role authorized, `TagCreated` event.
+- **`update_permissions`:** create/update `PermissionAccount` without
+  `init_if_needed`; roles reader/writer/maintainer/admin; owner-only admin;
+  `PermissionChanged` event.
+- **`transfer_repository`:** owner-only `owner` update; `RepositoryTransferred`
+  event. **PDA caveat:** the repo PDA is derived from the *original* owner, so
+  clients use the stored `repo_id` after transfer (ADR 0009).
+- **`anchor_program_source`:** permissionless claim `program_id → repo → commit →
+  artifact_hash`; requires commit-in-history and a loader-owned executable
+  program; `verified = 0`; `ProgramSourceAnchored` event.
+- **Enforcement:** `refs::require_min_role` wired into `create_commit` (writer)
+  and `update_branch` (maintainer); permission account passed as a remaining
+  account.
+- **Tests:** `tests/phase9.rs` (9 tests) — tag create/duplicate/unauthorized,
+  permission create/update/invalid-role, transfer/non-owner, provenance
+  claim/duplicate/non-program, allowlist writer vs reader enforcement.
+- **Deferred (tracked in ADR 0009):** CLI commands (`forge tag/merge/
+  verify-program`, permissions) and Arweave checkpoints (9b); `set_program_verified`;
+  authority-PDA CPI mock; `git-remote-forge`.
+
 ---
 
 ## Phase 10 — TypeScript SDK, Explorer UI, Indexer & End-to-End Demo Hardening

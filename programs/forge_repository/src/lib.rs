@@ -3,12 +3,13 @@
 //! Onchain anchor for Git-like repository history, branch refs, authorship
 //! attestations, and deployed-program source provenance.
 //!
-//! # Phase 3–4 status
+//! # Status
 //!
 //! Implemented: account state model (§4), PDAs, `initialize_repository`,
-//! `create_branch`, and `create_commit` with Ed25519 attestation verification
-//! (§9.2, §9.4). Branch advancement, storage, provenance and permissions land in
-//! Phases 5–9 (see `phase_implementation.md`).
+//! `create_branch`, `create_commit` (Ed25519 attestation), `update_branch`,
+//! `reset_branch`, `delete_branch`, `merge`, `create_tag`,
+//! `update_permissions`, `transfer_repository`, and `anchor_program_source`
+//! (§9.2). See `phase_implementation.md` and `docs/adr/`.
 //!
 //! # One source of truth
 //!
@@ -48,16 +49,20 @@ use anchor_lang::prelude::*;
 // `Context<T>` type). The derive-generated `__client_accounts_*` modules are
 // crate-visible; re-export them at the root as well so the macro can find
 // them.
+pub(crate) use instructions::anchor_program_source::__client_accounts_anchor_program_source;
 pub(crate) use instructions::create_branch::__client_accounts_create_branch;
 pub(crate) use instructions::create_commit::__client_accounts_create_commit;
+pub(crate) use instructions::create_tag::__client_accounts_create_tag;
 pub(crate) use instructions::delete_branch::__client_accounts_delete_branch;
 pub(crate) use instructions::initialize_repository::__client_accounts_initialize_repository;
 pub(crate) use instructions::merge::__client_accounts_merge;
 pub(crate) use instructions::reset_branch::__client_accounts_reset_branch;
+pub(crate) use instructions::transfer_repository::__client_accounts_transfer_repository;
 pub(crate) use instructions::update_branch::__client_accounts_update_branch;
+pub(crate) use instructions::update_permissions::__client_accounts_update_permissions;
 pub use instructions::{
-    CreateBranch, CreateCommit, DeleteBranch, InitializeRepository, Merge, ResetBranch,
-    UpdateBranch,
+    AnchorProgramSource, CreateBranch, CreateCommit, CreateTag, DeleteBranch, InitializeRepository,
+    Merge, ResetBranch, TransferRepository, UpdateBranch, UpdatePermissions,
 };
 
 declare_id!("4smCAEoycSXSvVsyic8ircQmHmENPCHn17Fma83SYVbf");
@@ -186,5 +191,63 @@ pub mod forge_repository {
         expected_target_seq: u64,
     ) -> Result<()> {
         instructions::merge::handler(ctx, merge_commit_oid, expected_target_seq)
+    }
+
+    /// Creates an immutable, tagger-signed release tag (§9.2).
+    ///
+    /// The transaction must prepend an Ed25519 verify over
+    /// `forge_object::tag::tag_message`.
+    ///
+    /// # Errors
+    /// See [`instructions::create_tag::handler`] for validation failures.
+    pub fn create_tag(
+        ctx: Context<CreateTag>,
+        name: [u8; 32],
+        target_commit: [u8; 32],
+        message_hash: [u8; 32],
+    ) -> Result<()> {
+        instructions::create_tag::handler(ctx, name, target_commit, message_hash)
+    }
+
+    /// Grants or updates a contributor's role (§9.2, §4.6).
+    ///
+    /// # Errors
+    /// See [`instructions::update_permissions::handler`] for validation failures.
+    pub fn update_permissions(
+        ctx: Context<UpdatePermissions>,
+        contributor: Pubkey,
+        role: u8,
+        expires_slot: u64,
+    ) -> Result<()> {
+        instructions::update_permissions::handler(ctx, contributor, role, expires_slot)
+    }
+
+    /// Transfers repository ownership (§9.2, §15).
+    ///
+    /// # Errors
+    /// See [`instructions::transfer_repository::handler`] for validation failures.
+    pub fn transfer_repository(ctx: Context<TransferRepository>, new_owner: Pubkey) -> Result<()> {
+        instructions::transfer_repository::handler(ctx, new_owner)
+    }
+
+    /// Anchors a program→commit source-provenance claim (§9.2, §12.2).
+    ///
+    /// # Errors
+    /// See [`instructions::anchor_program_source::handler`] for validation
+    /// failures.
+    pub fn anchor_program_source(
+        ctx: Context<AnchorProgramSource>,
+        program_id: Pubkey,
+        commit_oid: [u8; 32],
+        artifact_hash: [u8; 32],
+        build_metadata_hash: [u8; 32],
+    ) -> Result<()> {
+        instructions::anchor_program_source::handler(
+            ctx,
+            program_id,
+            commit_oid,
+            artifact_hash,
+            build_metadata_hash,
+        )
     }
 }

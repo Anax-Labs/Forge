@@ -28,6 +28,10 @@ pub const ED25519_PROGRAM_ID: Pubkey = pubkey!("Ed25519SigVerify1111111111111111
 /// Instructions sysvar (transaction introspection, §9.4).
 pub const INSTRUCTIONS_SYSVAR_ID: Pubkey = pubkey!("Sysvar1nstructions1111111111111111111111111");
 
+/// Upgradeable BPF loader program; deployed programs are owned by it (§12.2).
+pub const BPF_LOADER_UPGRADEABLE_ID: Pubkey =
+    pubkey!("BPFLoaderUpgradeab1e11111111111111111111111");
+
 /// Repository / branch / tag name buffer length.
 ///
 /// Names are padded with NUL bytes to this fixed length. This is capped at 32

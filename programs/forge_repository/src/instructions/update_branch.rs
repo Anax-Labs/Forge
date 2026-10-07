@@ -67,7 +67,13 @@ pub fn handler(
 ) -> Result<()> {
     let authority_key = ctx.accounts.authority.key();
     let repo_key = ctx.accounts.repository.key();
-    crate::auth::require_repo_owner(&ctx.accounts.repository, &authority_key)?;
+    crate::refs::require_min_role(
+        &repo_key,
+        &ctx.accounts.repository.owner,
+        &authority_key,
+        crate::state::permission::ROLE_MAINTAINER,
+        ctx.remaining_accounts.first(),
+    )?;
 
     let (branch_name, old_head) = {
         let branch = &ctx.accounts.branch;

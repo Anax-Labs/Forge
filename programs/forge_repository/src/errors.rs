@@ -86,4 +86,24 @@ pub enum ForgeError {
     /// The default branch cannot be deleted (§7.2).
     #[msg("the default branch cannot be deleted")]
     CannotDeleteDefaultBranch,
+
+    /// A permission role tag is not one of reader/writer/maintainer/admin (§4.6).
+    #[msg("invalid permission role")]
+    InvalidRole,
+
+    /// The signer's role is below the level required for this action (§7.5).
+    #[msg("signer role is insufficient for this action")]
+    InsufficientRole,
+
+    /// The attested program is not owned by the upgradeable loader (§9.2, §12.2).
+    #[msg("program account is not a deployed upgradeable program")]
+    ProgramNotUpgradeable,
+
+    /// A permission account already exists where creation was expected.
+    #[msg("permission account already exists")]
+    PermissionAlreadyExists,
+
+    /// The provenance artifact hash was all-zero (§9.2, §12.2).
+    #[msg("artifact hash is invalid")]
+    InvalidArtifactHash,
 }

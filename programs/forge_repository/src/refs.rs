@@ -9,7 +9,7 @@ use anchor_lang::prelude::*;
 use anchor_lang::{AccountDeserialize, Discriminator};
 
 use crate::errors::ForgeError;
-use crate::state::CommitAccount;
+use crate::state::{CommitAccount, PermissionAccount};
 
 /// Requires `branch_key` to be the canonical `["branch", repo, name]` PDA.
 ///
@@ -52,6 +52,68 @@ pub fn load_commit(
         ForgeError::UnknownCommit
     );
     Ok(commit)
+}
+
+/// Loads and validates the `PermissionAccount` for `contributor` in `repo`.
+///
+/// # Errors
+/// Returns [`ForgeError::InvalidPda`] / [`ForgeError::Unauthorized`] when the
+/// account is not the canonical permission PDA for this contributor.
+pub fn load_permission(
+    repo: &Pubkey,
+    contributor: &Pubkey,
+    info: &AccountInfo,
+) -> Result<PermissionAccount> {
+    let (expected_pda, _) = crate::pda::permission_pda(repo, contributor);
+    require_keys_eq!(*info.key, expected_pda, ForgeError::InvalidPda);
+    require_keys_eq!(*info.owner, crate::ID, ForgeError::Unauthorized);
+
+    let data = info.try_borrow_data()?;
+    require!(
+        data.len() >= 8 + PermissionAccount::LEN,
+        ForgeError::Unauthorized
+    );
+    require!(
+        &data[..8] == PermissionAccount::DISCRIMINATOR,
+        ForgeError::Unauthorized
+    );
+    let permission = PermissionAccount::try_deserialize(&mut &data[..])?;
+    require_keys_eq!(permission.repo, *repo, ForgeError::Unauthorized);
+    require_keys_eq!(
+        permission.contributor,
+        *contributor,
+        ForgeError::Unauthorized
+    );
+    Ok(permission)
+}
+
+/// Authorization for a repository action requiring at least `min_role` (§7.5).
+///
+/// The repository owner is always authorized. Otherwise the optional permission
+/// account (passed as a remaining account) must be the signer's canonical
+/// [`PermissionAccount`], unexpired, with `role >= min_role`.
+///
+/// # Errors
+/// - [`ForgeError::Unauthorized`] if the signer has no valid permission entry.
+/// - [`ForgeError::InsufficientRole`] if the role is below `min_role`.
+pub fn require_min_role(
+    repo: &Pubkey,
+    owner: &Pubkey,
+    signer: &Pubkey,
+    min_role: u8,
+    permission: Option<&AccountInfo>,
+) -> Result<()> {
+    if owner == signer {
+        return Ok(());
+    }
+    let info = permission.ok_or(ForgeError::Unauthorized)?;
+    let permission = load_permission(repo, signer, info)?;
+    let clock = Clock::get()?;
+    if permission.expires_slot != 0 && clock.slot > permission.expires_slot {
+        return Err(ForgeError::Unauthorized.into());
+    }
+    require!(permission.role >= min_role, ForgeError::InsufficientRole);
+    Ok(())
 }
 
 /// Whether a new commit is a valid fast-forward or merge of `old_head`.

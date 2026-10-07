@@ -7,9 +7,11 @@ storage.
 
 Working name: `Forge` (protocol), `forge` (CLI).
 
-> Status: **Phase 8 — onchain CLI (`push` / `clone` / `pull` / `verify`).**
-> Phases 1–7 plus chain txs (Ed25519-prepended `create_commit` /
-> `update_branch`) against LiteSVM or `FORGE_RPC`. See
+> Status: **Phase 9 (program side) — tags, permissions, ownership transfer, and
+> program source provenance.** Phases 1–8 (canonical engine, onchain core,
+> storage, local + onchain CLI) plus the Phase 9 program instructions
+> (`create_tag`, `update_permissions`, `transfer_repository`,
+> `anchor_program_source`) and role enforcement. Phase 9b CLI commands remain. See
 > [`phase_implementation.md`](phase_implementation.md) for the 10-phase roadmap,
 > [`docs/adr/`](docs/adr/) for frozen design decisions, and
 > [`ONCHAIN_VERSION_CONTROL_ARCHITECTURE.md`](ONCHAIN_VERSION_CONTROL_ARCHITECTURE.md)

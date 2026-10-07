@@ -51,6 +51,7 @@ pub mod hash;
 pub mod history;
 pub mod object;
 pub mod path;
+pub mod tag;
 pub mod tree;
 
 pub use attestation::Attestation;

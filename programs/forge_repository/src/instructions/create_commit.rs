@@ -69,7 +69,9 @@ pub struct CreateCommit<'info> {
 ///
 /// # Errors
 /// - [`ForgeError::InvalidParentCount`] if `parent_count > 2`.
-/// - [`ForgeError::Unauthorized`] if the author is not the repository owner.
+/// - [`ForgeError::Unauthorized`] / [`ForgeError::InsufficientRole`] if the
+///   author is neither the owner nor a writer-role contributor (pass the
+///   contributor's `PermissionAccount` as a remaining account).
 /// - [`ForgeError::InvalidCommitOid`] if the commit/tree oid or attestation
 ///   hash is zero or not 32 bytes.
 /// - [`ForgeError::InvalidParent`] / [`ForgeError::SelfParent`] /
@@ -96,7 +98,13 @@ pub fn handler(
     let author_key = ctx.accounts.author.key();
     let repo_key = ctx.accounts.repository.key();
 
-    crate::auth::require_repo_owner(&ctx.accounts.repository, &author_key)?;
+    crate::refs::require_min_role(
+        &repo_key,
+        &ctx.accounts.repository.owner,
+        &author_key,
+        crate::state::permission::ROLE_WRITER,
+        ctx.remaining_accounts.first(),
+    )?;
 
     require!(commit_oid != [0u8; 32], ForgeError::InvalidCommitOid);
     require!(tree_oid != [0u8; 32], ForgeError::InvalidCommitOid);
