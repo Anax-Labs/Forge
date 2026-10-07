@@ -66,9 +66,19 @@ pub enum Command {
     /// Verify a deployed program's source provenance
     VerifyProgram { program_id: String },
     /// Create a release tag
-    Tag { name: String },
+    Tag {
+        name: String,
+        /// Also upload a release checkpoint to Arweave (requires config).
+        #[arg(long)]
+        checkpoint: bool,
+    },
     /// Merge a branch
     Merge { branch: String },
+    /// Manage contributor roles
+    Permissions {
+        #[command(subcommand)]
+        action: PermissionsAction,
+    },
     /// Garbage-collect and verify storage availability
     Gc {
         #[arg(long)]
@@ -85,6 +95,21 @@ pub enum RemoteAction {
     List,
     /// Remove a remote
     Remove { name: String },
+}
+
+/// Permission subcommands.
+#[derive(Debug, Subcommand)]
+pub enum PermissionsAction {
+    /// Grant or update a contributor's role
+    Set {
+        contributor: String,
+        role: String,
+        /// Slot the role expires at (0 = never)
+        #[arg(long, default_value_t = 0)]
+        expires_slot: u64,
+    },
+    /// Show a contributor's role
+    Get { contributor: String },
 }
 
 #[derive(Parser)]

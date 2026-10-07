@@ -35,7 +35,11 @@ pub fn set_test_chain(chain: Option<Chain>) {
     TEST_CHAIN.with(|slot| *slot.borrow_mut() = chain);
 }
 
-fn active_chain() -> Result<Chain> {
+/// The active chain (injected test chain, else `FORGE_RPC`).
+///
+/// # Errors
+/// RPC construction errors.
+pub fn active_chain() -> Result<Chain> {
     TEST_CHAIN
         .with(|slot| slot.borrow().clone())
         .map_or_else(Chain::from_env, Ok)

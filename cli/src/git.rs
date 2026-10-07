@@ -154,6 +154,47 @@ impl GitRepo {
         Ok(())
     }
 
+    /// Create a lightweight git tag `name` at `oid`.
+    ///
+    /// # Errors
+    /// Invalid name or `git tag` failure.
+    pub fn create_tag(&self, name: &str, oid: &Oid) -> Result<()> {
+        validate_repo_path(name)?;
+        git_stdout(&self.root, &["tag", name, &oid.to_hex()], b"")?;
+        Ok(())
+    }
+
+    /// `git merge --no-ff <branch>` with an explicit committer identity.
+    ///
+    /// # Errors
+    /// `git merge` failure (e.g. conflicts).
+    pub fn merge_no_ff(&self, branch: &str, name: &str, email: &str, timestamp: i64) -> Result<()> {
+        validate_repo_path(branch)?;
+        let date = format!("{timestamp} +0000");
+        let message = format!("Merge branch '{branch}'");
+        let output = Command::new("git")
+            .current_dir(&self.root)
+            .args(["merge", "--no-ff", "-m", &message, branch])
+            .env("GIT_AUTHOR_NAME", name)
+            .env("GIT_AUTHOR_EMAIL", email)
+            .env("GIT_AUTHOR_DATE", &date)
+            .env("GIT_COMMITTER_NAME", name)
+            .env("GIT_COMMITTER_EMAIL", email)
+            .env("GIT_COMMITTER_DATE", &date)
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .output()
+            .context("spawn git merge")?;
+        if !output.status.success() {
+            bail!(
+                "git merge failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
+        Ok(())
+    }
+
     /// Walk first-parent history (`oid`, subject) from `branch` or HEAD.
     ///
     /// # Errors

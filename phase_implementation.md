@@ -642,7 +642,7 @@ All SHOULD-HAVE protocol features work and are tested; provenance claim vs. veri
 - Squads/Realms integration is a demo stretch, not required to prove the hook.
 - Provenance semantics for upgrade authority changes are unspecified.
 
-### Status (program side — 9a implemented; CLI 9b pending)
+### Status (implemented — program + CLI)
 
 - **`create_tag`:** tagger-signed (Ed25519 over `forge_object::tag::tag_message`),
   immutable `init`-only `TagAccount`, writer-role authorized, `TagCreated` event.
@@ -661,9 +661,12 @@ All SHOULD-HAVE protocol features work and are tested; provenance claim vs. veri
 - **Tests:** `tests/phase9.rs` (9 tests) — tag create/duplicate/unauthorized,
   permission create/update/invalid-role, transfer/non-owner, provenance
   claim/duplicate/non-program, allowlist writer vs reader enforcement.
-- **Deferred (tracked in ADR 0009):** CLI commands (`forge tag/merge/
-  verify-program`, permissions) and Arweave checkpoints (9b); `set_program_verified`;
-  authority-PDA CPI mock; `git-remote-forge`.
+- **CLI (9b):** `forge permissions set|get`, `forge tag [--checkpoint]`
+  (local tag + signed `create_tag` + local/Arweave checkpoint), `forge merge`
+  (git merge --no-ff then push), `forge verify-program` (claim/anchor/artifact
+  check with exit codes). `cli/tests/phase9_cli.rs` (3 tests).
+- **Deferred (tracked in ADR 0009):** `set_program_verified`; authority-PDA CPI
+  mock; `git-remote-forge`; `PermissionAccount` IDL exposure (Phase 10).
 
 ---
 

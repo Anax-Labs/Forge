@@ -1,6 +1,6 @@
 # ADR 0009 — Tags, permissions, ownership transfer, and provenance
 
-- **Status:** Accepted (Phase 9, program side; CLI in Phase 9b)
+- **Status:** Accepted (Phase 9 complete — program + CLI)
 - **Spec:** §4.5 (tags), §4.6 (permissions), §4.7/§12.2/§12.4 (provenance),
   §7.5/§16 (roles/authority hook), §9.2, §15 (ownership).
 - **Related:** ADR 0002 (names/seeds), ADR 0004 (Ed25519), ADR 0005 (branch refs).
@@ -55,10 +55,25 @@ referenced program account is owned by the upgradeable loader and executable;
 verify-program` (Phase 9b) distinguishes a claim from an independently verified
 build. One claim per program (the PDA is keyed by `program_id`).
 
+## CLI (Phase 9b)
+
+- **`forge permissions set|get <contributor> <role> [--expires-slot]`** →
+  `update_permissions`; `get` reads the `PermissionAccount`.
+- **`forge tag <name> [--checkpoint]`** → local lightweight git tag + signed
+  `create_tag`; with `--checkpoint` writes `.forge/checkpoints/<name>.json` and,
+  when `FORGE_ARWEAVE_URL` is set, uploads it via `forge_storage::ArweaveBundler`.
+- **`forge merge <branch>`** → `git merge --no-ff` locally, then `forge push`.
+  The pushed merge commit is accepted onchain by `update_branch`, whose
+  fast-forward/merge rule already permits a two-parent commit with one parent at
+  the current head; the dedicated `merge` instruction remains available for
+  callers that need explicit target/source topology.
+- **`forge verify-program <id>`** → fetches the provenance claim, checks the
+  claimed commit is anchored, and (when `FORGE_VERIFY_SO` points at a rebuilt
+  artifact) runs `solana-verify get-executable-hash` and compares. Outputs
+  `VERIFIED` (0) / `MISMATCH` (1) / `UNVERIFIED_CLAIM` (2) / missing (3).
+
 ## Deferred (tracked)
 
-- **CLI (Phase 9b):** `forge tag`, `forge merge`, `forge verify-program`,
-  permission commands; Arweave checkpoint upload for tags.
 - **`set_program_verified`:** requires a designated verifier authority, which is
   not yet defined; kept as a distinct future trust level (§9.2).
 - **Authority-PDA rule hook (§16.2):** the `authority`/`permissions_mode` fields
@@ -67,8 +82,8 @@ build. One claim per program (the PDA is keyed by `program_id`).
 - **`git-remote-forge`:** SHOULD-HAVE; deferred per the roadmap's scope note.
 - **`PermissionAccount` is absent from the generated IDL** because
   `update_permissions` uses an `UncheckedAccount` for its create-or-update path.
-  The struct is public and exported, but Codama clients cannot decode it until
-  Phase 9b exposes it (e.g. a read-only getter or a split create/update).
+  The CLI parses it directly, but Codama clients cannot decode it until Phase 10
+  exposes it (e.g. a read-only getter or a split create/update).
 
 ## Consequences
 

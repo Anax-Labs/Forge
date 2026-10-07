@@ -27,9 +27,35 @@ const NATIVE_LOADER: &str = "NativeLoader1111111111111111111111111111111";
 const REPO_SEED: &[u8] = b"repo";
 const BRANCH_SEED: &[u8] = b"branch";
 const COMMIT_SEED: &[u8] = b"commit";
+const TAG_SEED: &[u8] = b"tag";
+const PERM_SEED: &[u8] = b"perm";
+const PROG_SEED: &[u8] = b"prog";
 
 /// Anchor custom error `StaleBranchHead` (declaration index 15 + 6000).
 pub const STALE_BRANCH_HEAD: u32 = 6015;
+
+/// Contributor role: reader (§4.6).
+pub const ROLE_READER: u8 = 0;
+/// Contributor role: writer.
+pub const ROLE_WRITER: u8 = 1;
+/// Contributor role: maintainer.
+pub const ROLE_MAINTAINER: u8 = 2;
+/// Contributor role: admin.
+pub const ROLE_ADMIN: u8 = 3;
+
+/// Parse a role name (`reader`/`writer`/`maintainer`/`admin`).
+///
+/// # Errors
+/// Unknown role name.
+pub fn parse_role(s: &str) -> Result<u8> {
+    match s {
+        "reader" => Ok(ROLE_READER),
+        "writer" => Ok(ROLE_WRITER),
+        "maintainer" => Ok(ROLE_MAINTAINER),
+        "admin" => Ok(ROLE_ADMIN),
+        other => bail!("unknown role `{other}` (reader|writer|maintainer|admin)"),
+    }
+}
 
 /// Onchain repository snapshot.
 #[derive(Debug, Clone)]
@@ -86,6 +112,57 @@ pub struct CommitAccount {
     pub attestation_hash: [u8; 32],
     /// History log index.
     pub seq: u64,
+}
+
+/// Onchain tag snapshot (§4.5).
+#[derive(Debug, Clone)]
+pub struct TagAccount {
+    /// Repository PDA.
+    pub repo: Address,
+    /// NUL-padded tag name.
+    pub name: [u8; 32],
+    /// Target commit oid.
+    pub target_commit: [u8; 32],
+    /// Tagger wallet.
+    pub tagger: Address,
+    /// Tag message hash.
+    pub message_hash: [u8; 32],
+    /// 1 if signed.
+    pub signed: u8,
+}
+
+/// Onchain contributor permission snapshot (§4.6).
+#[derive(Debug, Clone)]
+pub struct PermissionAccount {
+    /// Repository PDA.
+    pub repo: Address,
+    /// Contributor wallet.
+    pub contributor: Address,
+    /// Role tag.
+    pub role: u8,
+    /// Slot granted.
+    pub granted_slot: u64,
+    /// Expiry slot (0 = never).
+    pub expires_slot: u64,
+}
+
+/// Onchain program-source provenance snapshot (§4.7).
+#[derive(Debug, Clone)]
+pub struct ProgramSourceAttestation {
+    /// Deployed program account.
+    pub program_id: Address,
+    /// Repository holding the source.
+    pub repo: Address,
+    /// Commit the artifact was built from.
+    pub commit_oid: [u8; 32],
+    /// Executable hash of the deployed program.
+    pub artifact_hash: [u8; 32],
+    /// Build metadata hash.
+    pub build_metadata_hash: [u8; 32],
+    /// Claimant wallet.
+    pub attester: Address,
+    /// 0 = claim, 1 = verified.
+    pub verified: u8,
 }
 
 /// Chain transport: LiteSVM (tests) or JSON-RPC (local validator / devnet).
@@ -272,6 +349,33 @@ impl Chain {
         };
         Ok(Some(parse_commit(&data)?))
     }
+
+    /// Fetch a tag account.
+    pub fn fetch_tag(&self, tag: &Address) -> Result<Option<TagAccount>> {
+        let Some(data) = self.get_account_data(tag)? else {
+            return Ok(None);
+        };
+        Ok(Some(parse_tag(&data)?))
+    }
+
+    /// Fetch a permission account.
+    pub fn fetch_permission(&self, permission: &Address) -> Result<Option<PermissionAccount>> {
+        let Some(data) = self.get_account_data(permission)? else {
+            return Ok(None);
+        };
+        Ok(Some(parse_permission(&data)?))
+    }
+
+    /// Fetch a program-source provenance attestation.
+    pub fn fetch_program_attestation(
+        &self,
+        attestation: &Address,
+    ) -> Result<Option<ProgramSourceAttestation>> {
+        let Some(data) = self.get_account_data(attestation)? else {
+            return Ok(None);
+        };
+        Ok(Some(parse_program_attestation(&data)?))
+    }
 }
 
 /// Compare-and-swap lost the race.
@@ -362,6 +466,24 @@ pub fn branch_pda(pid: &Address, repo: &Address, name: &[u8; 32]) -> Address {
 #[must_use]
 pub fn commit_pda(pid: &Address, repo: &Address, oid: &[u8; 32]) -> Address {
     Address::find_program_address(&[COMMIT_SEED, repo.as_ref(), oid.as_ref()], pid).0
+}
+
+/// Tag PDA `["tag", repo, name]`.
+#[must_use]
+pub fn tag_pda(pid: &Address, repo: &Address, name: &[u8; 32]) -> Address {
+    Address::find_program_address(&[TAG_SEED, repo.as_ref(), name.as_ref()], pid).0
+}
+
+/// Permission PDA `["perm", repo, contributor]`.
+#[must_use]
+pub fn permission_pda(pid: &Address, repo: &Address, contributor: &Address) -> Address {
+    Address::find_program_address(&[PERM_SEED, repo.as_ref(), contributor.as_ref()], pid).0
+}
+
+/// Program-source attestation PDA `["prog", program_id]`.
+#[must_use]
+pub fn program_attestation_pda(pid: &Address, program_id: &Address) -> Address {
+    Address::find_program_address(&[PROG_SEED, program_id.as_ref()], pid).0
 }
 
 /// Default program `.so` path relative to the CLI crate.
@@ -518,6 +640,125 @@ pub fn update_branch_instruction(
     }
 }
 
+/// `create_tag` (signed; prepend an Ed25519 verify over the tag message).
+pub fn create_tag_instruction(
+    pid: &Address,
+    tagger: &Address,
+    repo: Address,
+    tag_name: [u8; 32],
+    target_commit: [u8; 32],
+    message_hash: [u8; 32],
+) -> Instruction {
+    let tag = tag_pda(pid, &repo, &tag_name);
+    let commit = commit_pda(pid, &repo, &target_commit);
+    let mut data = Vec::new();
+    data.extend_from_slice(&ix_discriminator("create_tag"));
+    data.extend_from_slice(&tag_name);
+    data.extend_from_slice(&target_commit);
+    data.extend_from_slice(&message_hash);
+    Instruction {
+        program_id: *pid,
+        accounts: vec![
+            AccountMeta::new(*tagger, true),
+            AccountMeta::new_readonly(repo, false),
+            AccountMeta::new(tag, false),
+            AccountMeta::new_readonly(commit, false),
+            AccountMeta::new_readonly(instructions_sysvar(), false),
+            AccountMeta::new_readonly(ed25519_program(), false),
+            AccountMeta::new_readonly(system_program(), false),
+            AccountMeta::new_readonly(event_authority(pid), false),
+            AccountMeta::new_readonly(*pid, false),
+        ],
+        data,
+    }
+}
+
+/// `update_permissions`.
+pub fn update_permissions_instruction(
+    pid: &Address,
+    admin: &Address,
+    repo: Address,
+    contributor: Address,
+    role: u8,
+    expires_slot: u64,
+) -> Instruction {
+    let permission = permission_pda(pid, &repo, &contributor);
+    let mut data = Vec::new();
+    data.extend_from_slice(&ix_discriminator("update_permissions"));
+    data.extend_from_slice(contributor.as_ref());
+    data.push(role);
+    data.extend_from_slice(&expires_slot.to_le_bytes());
+    Instruction {
+        program_id: *pid,
+        accounts: vec![
+            AccountMeta::new(*admin, true),
+            AccountMeta::new(repo, false),
+            AccountMeta::new(permission, false),
+            AccountMeta::new_readonly(system_program(), false),
+            AccountMeta::new_readonly(event_authority(pid), false),
+            AccountMeta::new_readonly(*pid, false),
+        ],
+        data,
+    }
+}
+
+/// `transfer_repository`.
+pub fn transfer_repository_instruction(
+    pid: &Address,
+    owner: &Address,
+    repo: Address,
+    new_owner: Address,
+) -> Instruction {
+    let mut data = Vec::new();
+    data.extend_from_slice(&ix_discriminator("transfer_repository"));
+    data.extend_from_slice(new_owner.as_ref());
+    Instruction {
+        program_id: *pid,
+        accounts: vec![
+            AccountMeta::new_readonly(*owner, true),
+            AccountMeta::new(repo, false),
+            AccountMeta::new_readonly(event_authority(pid), false),
+            AccountMeta::new_readonly(*pid, false),
+        ],
+        data,
+    }
+}
+
+/// `anchor_program_source`.
+#[allow(clippy::too_many_arguments)]
+pub fn anchor_program_source_instruction(
+    pid: &Address,
+    attester: &Address,
+    repo: Address,
+    program_id_arg: Address,
+    commit_oid: [u8; 32],
+    artifact_hash: [u8; 32],
+    build_metadata_hash: [u8; 32],
+) -> Instruction {
+    let attestation = program_attestation_pda(pid, &program_id_arg);
+    let commit = commit_pda(pid, &repo, &commit_oid);
+    let mut data = Vec::new();
+    data.extend_from_slice(&ix_discriminator("anchor_program_source"));
+    data.extend_from_slice(program_id_arg.as_ref());
+    data.extend_from_slice(&commit_oid);
+    data.extend_from_slice(&artifact_hash);
+    data.extend_from_slice(&build_metadata_hash);
+    Instruction {
+        program_id: *pid,
+        accounts: vec![
+            AccountMeta::new(*attester, true),
+            AccountMeta::new_readonly(repo, false),
+            AccountMeta::new(attestation, false),
+            AccountMeta::new_readonly(commit, false),
+            AccountMeta::new_readonly(program_id_arg, false),
+            AccountMeta::new_readonly(system_program(), false),
+            AccountMeta::new_readonly(event_authority(pid), false),
+            AccountMeta::new_readonly(*pid, false),
+        ],
+        data,
+    }
+}
+
 /// Convert an [`Oid`] to the 32-byte onchain form.
 #[must_use]
 pub fn oid32(oid: &Oid) -> [u8; 32] {
@@ -560,6 +801,45 @@ fn parse_commit(data: &[u8]) -> Result<CommitAccount> {
         message_hash: take32(&mut s)?,
         attestation_hash: take32(&mut s)?,
         seq: take_u64(&mut s)?,
+    })
+}
+
+fn parse_tag(data: &[u8]) -> Result<TagAccount> {
+    let mut s = skip_disc(data)?;
+    Ok(TagAccount {
+        repo: Address::new_from_array(take32(&mut s)?),
+        name: take32(&mut s)?,
+        target_commit: take32(&mut s)?,
+        tagger: Address::new_from_array(take32(&mut s)?),
+        message_hash: take32(&mut s)?,
+        signed: {
+            let _created_slot = take_u64(&mut s)?;
+            take_u8(&mut s)?
+        },
+    })
+}
+
+fn parse_permission(data: &[u8]) -> Result<PermissionAccount> {
+    let mut s = skip_disc(data)?;
+    Ok(PermissionAccount {
+        repo: Address::new_from_array(take32(&mut s)?),
+        contributor: Address::new_from_array(take32(&mut s)?),
+        role: take_u8(&mut s)?,
+        granted_slot: take_u64(&mut s)?,
+        expires_slot: take_u64(&mut s)?,
+    })
+}
+
+fn parse_program_attestation(data: &[u8]) -> Result<ProgramSourceAttestation> {
+    let mut s = skip_disc(data)?;
+    Ok(ProgramSourceAttestation {
+        program_id: Address::new_from_array(take32(&mut s)?),
+        repo: Address::new_from_array(take32(&mut s)?),
+        commit_oid: take32(&mut s)?,
+        artifact_hash: take32(&mut s)?,
+        build_metadata_hash: take32(&mut s)?,
+        attester: Address::new_from_array(take32(&mut s)?),
+        verified: take_u8(&mut s)?,
     })
 }
 
