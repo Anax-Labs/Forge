@@ -7,12 +7,11 @@ storage.
 
 Working name: `Forge` (protocol), `forge` (CLI).
 
-> Status: **Phase 9 complete — tags, permissions, ownership transfer, and program
-> source provenance.** Phases 1–8 (canonical engine, onchain core, storage,
-> local + onchain CLI) plus the Phase 9 program instructions (`create_tag`,
-> `update_permissions`, `transfer_repository`, `anchor_program_source`), role
-> enforcement, and the `forge tag` / `forge merge` / `forge verify-program` /
-> `forge permissions` commands. See
+> Status: **Phase 10 (partial) — TypeScript SDK, benchmark, demo docs.** Phases
+> 1–9 complete (canonical engine, onchain core, storage, CLI, tags/permissions/
+> provenance). Phase 10 so far: a dependency-free TypeScript SDK that reproduces
+> the Rust golden vectors, a measured cost/CU benchmark, and a demo script; the
+> Next.js explorer and optional indexer remain. See
 > [`phase_implementation.md`](phase_implementation.md) for the 10-phase roadmap,
 > [`docs/adr/`](docs/adr/) for frozen design decisions, and
 > [`ONCHAIN_VERSION_CONTROL_ARCHITECTURE.md`](ONCHAIN_VERSION_CONTROL_ARCHITECTURE.md)
@@ -81,6 +80,8 @@ is **git-ignored** (never commit keypairs).
   dependency graph, requirement coverage matrix, risks, open questions.
 - [`docs/architecture.md`](docs/architecture.md) — system architecture, onchain
   program map, push data flow, and Mermaid diagrams.
+- [`docs/benchmark.md`](docs/benchmark.md) — measured CU + account-rent costs.
+- [`docs/demo.md`](docs/demo.md) — the §19.1 demo script and negative cases.
 - [`docs/protocol.md`](docs/protocol.md) — canonical byte formats (frozen in Phase 2).
 - [`docs/threat-model.md`](docs/threat-model.md) — security model checklist.
 - [`docs/adr/`](docs/adr/) — architecture decision records (events, names/seeds,

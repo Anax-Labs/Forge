@@ -64,3 +64,17 @@ jobs:
         # `anchor build` produced target/deploy/forge_repository.so, so the
         # Phase 3 LiteSVM tests execute here rather than skipping.
         run: cargo test --workspace --locked
+
+  sdk:
+    name: TypeScript SDK (node --test)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          # Node >= 23 strips TypeScript types natively, so the dependency-free
+          # SDK tests run with no `npm install`.
+          node-version: "24"
+      - name: SDK golden-vector tests (Rust <-> TS determinism)
+        run: node --test test/
+        working-directory: sdk

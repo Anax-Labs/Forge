@@ -7,9 +7,9 @@
   "main": "src/index.ts",
   "types": "src/index.ts",
   "scripts": {
-    "build": "echo \"sdk scaffold (Phase 10)\"",
-    "test": "echo \"no sdk tests yet\"",
-    "lint": "echo \"no sdk lint yet\""
+    "build": "echo \"sdk core is dependency-free; no build step\"",
+    "test": "node --test test/",
+    "lint": "node --check src/index.ts"
   },
   "dependencies": {
     "@solana/kit": "^8.0.0"
