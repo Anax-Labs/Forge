@@ -84,6 +84,7 @@ is **git-ignored** (never commit keypairs).
   program map, push data flow, and Mermaid diagrams.
 - [`docs/benchmark.md`](docs/benchmark.md) — measured CU + account-rent costs.
 - [`docs/demo.md`](docs/demo.md) — the §19.1 demo script and negative cases.
+- [`docs/deploy.md`](docs/deploy.md) — end-to-end deployment runbook.
 - [`docs/protocol.md`](docs/protocol.md) — canonical byte formats (frozen in Phase 2).
 - [`docs/threat-model.md`](docs/threat-model.md) — security model checklist.
 - [`docs/adr/`](docs/adr/) — architecture decision records (events, names/seeds,
