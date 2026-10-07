@@ -76,5 +76,6 @@ jobs:
           # SDK tests run with no `npm install`.
           node-version: "24"
       - name: SDK golden-vector tests (Rust <-> TS determinism)
-        run: node --test test/
+        # Explicit glob: Node 24 treats a bare directory arg as a module path.
+        run: node --test 'test/**/*.test.ts'
         working-directory: sdk

@@ -24,7 +24,7 @@ against real `git`). The TS implementation must stay byte-identical for both
 SHA-1 and SHA-256.
 
 ```bash
-node --test test/
+node --test 'test/**/*.test.ts'
 ```
 
 Every hashed value read from storage or RPC must be re-verified client-side
