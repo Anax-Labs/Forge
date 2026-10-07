@@ -128,7 +128,7 @@ custom merge engine, general rule VM, onchain file storage.
 - **No indexer:** PDAs are derived client-side; account bytes are parsed
   against frozen layouts (ADR 0008).
 
-## Phase 9 status (program side; CLI in 9b)
+## Phase 9 status (implemented — program + CLI)
 
 - **Tag forgery:** `create_tag` verifies the tagger's Ed25519 signature over a
   domain-separated tag message; the `TagAccount` is `init`-only, so a name cannot
@@ -144,3 +144,12 @@ custom merge engine, general rule VM, onchain file storage.
   executable program; the record is a claim (`verified = 0`), not a proof.
 - **Unbounded roles:** `update_permissions` rejects `role > admin` (`InvalidRole`)
   and never uses `init_if_needed`.
+
+## Phase 10 status (partial)
+
+Phase 10 adds **client-side interfaces only** (TypeScript SDK core, benchmark,
+demo docs) and introduces **no new onchain trust assumptions**. The SDK
+re-verifies every hashed value against the frozen `forge-object` encodings
+(proven by cross-language golden-vector tests), consistent with the "never trust
+offchain bytes" rule. The explorer UI and indexer (Phase 10b) are read-only
+caches and must remain non-authoritative.

@@ -1,11 +1,12 @@
 # Forge — Architecture
 
-> Status: **Phases 1–8 implemented.** This document reflects the code as built;
-> items marked `[ ]` are scheduled in later phases (see `../phase_implementation.md`).
-> Canonical byte formats are in [`protocol.md`](protocol.md); frozen design
-> decisions are in [`adr/`](adr/).
+> Status: **Phases 1–9 implemented; Phase 10 partial** (TypeScript SDK core,
+> benchmark, and demo docs done; explorer UI and indexer pending). This document
+> reflects the code as built; items marked `[ ]` are scheduled in Phase 10b (see
+> `../phase_implementation.md`). Canonical byte formats are in
+> [`protocol.md`](protocol.md); frozen design decisions are in [`adr/`](adr/).
 
-Legend: `[✓]` implemented (Phases 1–8) · `[ ]` planned (Phases 9–10) · `*` layout only.
+Legend: `[✓]` implemented (Phases 1–9 + SDK) · `[ ]` planned (Phase 10b) · `*` layout only.
 
 ---
 
@@ -50,25 +51,26 @@ Legend: `[✓]` implemented (Phases 1–8) · `[ ]` planned (Phases 9–10) · `
                                      │              SOLANA (devnet)                  │
                                      │   Anchor program: forge_repository            │
                                      │                                               │
-                                     │   Accounts            Instructions            │
-                                     │   ─────────           ────────────            │
-                                     │   RepositoryAccount   initialize_repository   │
-                                     │   BranchAccount       create_branch           │
-                                     │   CommitAccount       create_commit           │
-                                     │   TagAccount*         update_branch           │
-                                     │   PermissionAccount*  reset_branch            │
-                                     │   ProgramSourceAtt.*  delete_branch           │
-                                     │                       merge                   │
-                                     │   (* layout only)     create_tag*             │
-                                     │                       update_permissions*     │
-                                     │                       anchor_program_source*   │
+│   Accounts            Instructions            │
+│   ─────────           ────────────            │
+│   RepositoryAccount   initialize_repository   │
+│   BranchAccount       create_branch           │
+│   CommitAccount       create_commit           │
+│   TagAccount          update_branch           │
+│   PermissionAccount   reset_branch            │
+│   ProgramSourceAtt.   delete_branch           │
+│                       merge                   │
+│                       create_tag              │
+│                       update_permissions      │
+│                       transfer_repository     │
+│                       anchor_program_source   │
                                      └───────────────┬──────────────────────────────┘
                                                      │ events (emit_cpi!, not logs)
                                                      ▼
                                      ┌──────────────────────────────────────────────┐
                                      │   INDEXER (Helius) · SDK (@solana/kit) · WEB  │
                                      │   non-authoritative cache / human interface   │
-                                     │   [ ] Phase 10                                │
+                                     │   [~] Phase 10: SDK core ✓ · web/indexer [ ]  │
                                      └──────────────────────────────────────────────┘
 ```
 
@@ -122,6 +124,25 @@ delete_branch()
    ├─ require owner; forbid default branch (else CannotDeleteDefaultBranch)
    ├─ close BranchAccount (rent refund)
    └─ event BranchDeleted
+
+create_tag(name, target_commit, message_hash)        ── Phase 9
+   ├─ writer role; target commit exists; Ed25519 over "forge-tag\0"||repo||name||commit||msg
+   ├─ init TagAccount (immutable); signed = 1
+   └─ event TagCreated
+
+update_permissions(contributor, role, expires_slot)  ── Phase 9
+   ├─ owner-only admin; role <= admin (else InvalidRole)
+   ├─ create or update PermissionAccount (no init_if_needed)
+   └─ event PermissionChanged
+
+transfer_repository(new_owner)                       ── Phase 9
+   ├─ require owner; update RepositoryAccount.owner
+   └─ event RepositoryTransferred
+
+anchor_program_source(program_id, commit_oid, artifact_hash, build_metadata_hash) ── Phase 9
+   ├─ writer role; commit in history; program loader-owned + executable; hash non-zero
+   ├─ init ProgramSourceAttestation ["prog", program_id] (verified = 0, a claim)
+   └─ event ProgramSourceAnchored
 ```
 
 ---
