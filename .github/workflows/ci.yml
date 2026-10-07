@@ -66,7 +66,7 @@ jobs:
         run: cargo test --workspace --locked
 
   typescript:
-    name: TypeScript (Bun: SDK, web, indexer)
+    name: "TypeScript (Bun: SDK, web, indexer)"
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
