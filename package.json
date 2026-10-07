@@ -9,9 +9,9 @@
     "web",
     "indexer"
   ],
+  "packageManager": "bun@1.4.2",
   "scripts": {
-    "build": "npm run build --workspaces --if-present",
-    "test": "npm test --workspaces --if-present",
-    "lint": "npm run lint --workspaces --if-present"
+    "build": "bun run --filter '@onchain-forge/web' build",
+    "test": "bun run --filter '@onchain-forge/*' test"
   }
 }

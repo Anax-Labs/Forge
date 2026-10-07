@@ -1,12 +1,11 @@
 # Forge — Architecture
 
-> Status: **Phases 1–9 implemented; Phase 10 partial** (TypeScript SDK core,
-> benchmark, and demo docs done; explorer UI and indexer pending). This document
-> reflects the code as built; items marked `[ ]` are scheduled in Phase 10b (see
-> `../phase_implementation.md`). Canonical byte formats are in
-> [`protocol.md`](protocol.md); frozen design decisions are in [`adr/`](adr/).
+> Status: **Phases 1–10 implemented** (deferred: `@solana/kit`/Codama transaction
+> layer, fuzzing). This document reflects the code as built. Canonical byte
+> formats are in [`protocol.md`](protocol.md); frozen design decisions are in
+> [`adr/`](adr/).
 
-Legend: `[✓]` implemented (Phases 1–9 + SDK) · `[ ]` planned (Phase 10b) · `*` layout only.
+Legend: `[✓]` implemented · `[~]` partial · `[ ]` planned · `*` layout only.
 
 ---
 
@@ -70,7 +69,7 @@ Legend: `[✓]` implemented (Phases 1–9 + SDK) · `[ ]` planned (Phase 10b) ·
                                      ┌──────────────────────────────────────────────┐
                                      │   INDEXER (Helius) · SDK (@solana/kit) · WEB  │
                                      │   non-authoritative cache / human interface   │
-                                     │   [~] Phase 10: SDK core ✓ · web/indexer [ ]  │
+                                     │   [✓] Phase 10: SDK · explorer · indexer     │
                                      └──────────────────────────────────────────────┘
 ```
 

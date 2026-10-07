@@ -3,9 +3,9 @@
 TypeScript SDK for the Forge protocol.
 
 Status: **core implemented (Phase 10a).** The canonical encoding/verification
-primitives are dependency-free TypeScript and run under `node --test` with **no
-`npm install`**. The onchain RPC/transaction layer (`@solana/kit` v8+ + Codama
-client) is Phase 10b.
+primitives are dependency-free TypeScript and run under **Bun** (`bun test`) with
+no install of the SDK itself. The onchain RPC/transaction layer (`@solana/kit`
+v8+ + Codama client) is Phase 10b.
 
 ## Modules
 
@@ -24,7 +24,7 @@ against real `git`). The TS implementation must stay byte-identical for both
 SHA-1 and SHA-256.
 
 ```bash
-node --test 'test/**/*.test.ts'
+bun test
 ```
 
 Every hashed value read from storage or RPC must be re-verified client-side

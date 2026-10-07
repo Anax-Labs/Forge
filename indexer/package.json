@@ -3,10 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Optional Helius webhook/Geyser indexer (non-authoritative cache)",
   "scripts": {
-    "build": "echo \"indexer scaffold (Phase 10)\"",
-    "test": "echo \"no indexer tests yet\"",
-    "lint": "echo \"no indexer lint yet\""
+    "start": "bun run src/index.ts",
+    "test": "bun test"
   }
 }

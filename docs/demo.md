@@ -67,5 +67,6 @@ against LiteSVM + the in-repo CAS, including `push → clone → verify` with
 ```bash
 anchor build
 cargo test --workspace
-node --test 'sdk/test/**/*.test.ts'   # TS SDK reproduces the Rust golden vectors
+bun install && bun run test           # SDK + web + indexer (Bun)
+bun run --filter '@onchain-forge/web' build   # Next.js explorer
 ```

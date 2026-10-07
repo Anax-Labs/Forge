@@ -730,21 +730,26 @@ The §19.1 MVP demo runs reproducibly from a clean checkout; SDK/web consume the
 - Indexer/RPC rate limits and `getProgramAccounts` cost (§10.4) may affect the UI; must degrade gracefully.
 - Live network parameters (rent, v1 tx activation) may differ from the spec's research date; re-verify (§2.3, disclaimer).
 
-### Status (10a implemented; 10b pending)
+### Status (implemented)
 
 - **TypeScript SDK (`sdk/`)** — dependency-free core (`cbor`, `oid`, `object`,
-  `history`, `attestation`, `discriminator`) that runs under `node --test` with
-  no `npm install`. Tests cross-check `tests/vectors/golden.json`, proving the TS
-  implementation is byte-identical to the Rust `forge-object` engine (blob OIDs,
-  canonical attestation CBOR, `attestation_hash`, `history_root`, `repo_root`)
-  for both SHA-1 and SHA-256.
+  `history`, `attestation`, `discriminator`) run under **Bun**. Tests cross-check
+  `tests/vectors/golden.json`, proving the TS implementation is byte-identical to
+  the Rust `forge-object` engine (blob OIDs, canonical attestation CBOR,
+  `attestation_hash`, `history_root`, `repo_root`) for SHA-1 and SHA-256.
+- **Explorer (`web/`)** — Next.js App Router, read-only: repository list, commit
+  log with author + verification badges, tags, and program provenance. Accounts
+  are read via `getProgramAccounts` (discriminator + `memcmp`) and the
+  `history_root` is recomputed client-side with WebCrypto.
+- **Indexer (`indexer/`)** — optional Bun snapshotter reusing the explorer's
+  decoders; explicitly non-authoritative.
 - **Benchmark (`docs/benchmark.md`)** — measured `create_commit` ≈ 32,764 CU
   (incl. Ed25519) plus account-rent arithmetic from §10.
-- **Demo (`docs/demo.md`)** — the §19.1 narrative and negative-case matrix, each
-  mapped to an automated test.
-- **CI** — new `sdk` job runs `node --test` on Node 24 (native TS stripping).
-- **Pending (10b):** Next.js explorer UI, optional Helius indexer, `PermissionAccount`
-  IDL exposure for Codama, and fuzzing (nice-to-have).
+- **Demo (`docs/demo.md`)** — the §19.1 narrative and negative-case matrix.
+- **CI** — a `typescript` job installs with Bun and runs `bun test` (SDK, web,
+  indexer) plus the Next.js production build.
+- **Deferred:** `@solana/kit` + Codama transaction client, `PermissionAccount`
+  IDL exposure, fuzzing (nice-to-have).
 
 ---
 

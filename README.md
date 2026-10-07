@@ -7,11 +7,13 @@ storage.
 
 Working name: `Forge` (protocol), `forge` (CLI).
 
-> Status: **Phase 10 (partial) — TypeScript SDK, benchmark, demo docs.** Phases
-> 1–9 complete (canonical engine, onchain core, storage, CLI, tags/permissions/
-> provenance). Phase 10 so far: a dependency-free TypeScript SDK that reproduces
-> the Rust golden vectors, a measured cost/CU benchmark, and a demo script; the
-> Next.js explorer and optional indexer remain. See
+> Status: **Phase 10 complete — TypeScript SDK, Next.js explorer, indexer,
+> benchmark, demo.** Phases 1–9 complete (canonical engine, onchain core,
+> storage, CLI, tags/permissions/provenance) plus a dependency-free TS SDK that
+> reproduces the Rust golden vectors, a Next.js read-only explorer with
+> client-side `history_root` verification, an optional Bun indexer, a measured
+> cost/CU benchmark, and a demo script. Deferred: the `@solana/kit`/Codama
+> transaction layer and fuzzing. See
 > [`phase_implementation.md`](phase_implementation.md) for the 10-phase roadmap,
 > [`docs/adr/`](docs/adr/) for frozen design decisions, and
 > [`ONCHAIN_VERSION_CONTROL_ARCHITECTURE.md`](ONCHAIN_VERSION_CONTROL_ARCHITECTURE.md)

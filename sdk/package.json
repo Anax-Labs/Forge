@@ -8,7 +8,7 @@
   "types": "src/index.ts",
   "scripts": {
     "build": "echo \"sdk core is dependency-free; no build step\"",
-    "test": "node --test 'test/**/*.test.ts'",
+    "test": "bun test",
     "lint": "node --check src/index.ts"
   },
   "dependencies": {

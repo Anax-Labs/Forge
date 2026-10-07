@@ -65,17 +65,27 @@ jobs:
         # Phase 3 LiteSVM tests execute here rather than skipping.
         run: cargo test --workspace --locked
 
-  sdk:
-    name: TypeScript SDK (node --test)
+  typescript:
+    name: TypeScript (Bun: SDK, web, indexer)
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: oven-sh/setup-bun@v2
         with:
-          # Node >= 23 strips TypeScript types natively, so the dependency-free
-          # SDK tests run with no `npm install`.
-          node-version: "24"
+          bun-version: latest
+      - name: Install workspace dependencies
+        run: bun install --frozen-lockfile
       - name: SDK golden-vector tests (Rust <-> TS determinism)
-        # Explicit glob: Node 24 treats a bare directory arg as a module path.
-        run: node --test 'test/**/*.test.ts'
+        run: bun test
         working-directory: sdk
+      - name: Web unit tests
+        run: bun test
+        working-directory: web
+      - name: Indexer tests
+        run: bun test
+        working-directory: indexer
+      - name: Web build (Next.js)
+        run: bun run build
+        working-directory: web
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
